@@ -1,7 +1,7 @@
 package d7024e
 
 import (
-	"math"
+	//"math"
 	"fmt"
 )
 
@@ -110,13 +110,19 @@ func (branch *Branch) String() string{
 		tabs += "\t"
 	}
 	info = tabs + fmt.Sprintf("Exponent %v, Prefix: ", branch.exponent)
-	var i int
-	for i := 0; i < IDLength - (branch.exponent / 8); i++ {
+	var i, edge int
+	if(branch.exponent%8 != 0){
+		edge = 1
+	}
+	for i := 0; i < IDLength - (branch.exponent / 8) - edge; i++ {
 		info += fmt.Sprintf("%08b", branch.prefix[i])
 	}
-	i++
-	for j := 0; j < (8 - (branch.exponent %8)); j++ {
-		info += fmt.Sprintf("%01b", branch.prefix[i] >> uint(j)) 
+	if(i != 0){
+	i++}
+	if(branch.exponent % 8 != 0){
+		for j := 0; j < (8 - (branch.exponent %8)); j++ {
+			info += fmt.Sprintf("%01b", branch.prefix[i] >> uint(9-j)) 
+		}
 	}
 	info += "\n"
 	openBrack = tabs + "{\n"
@@ -132,13 +138,19 @@ func (leaf *Leaf) String() string{
 		tabs += "\t"
 	}
 	info = fmt.Sprintf("ID: %v, Number of entries: %v Exponent: %v Prefix: ", leaf.ID, leaf.buck.Len(), leaf.exponent )//,IDBits -leaf.exponent , leaf.prefix) //>> uint(leaf.exponent))
-	var i int
-	for i := 0; i < IDLength - int(math.Ceil(float64(leaf.exponent) / 8)); i++ {
+	var i, edge int
+	if(leaf.exponent%8 != 0){
+		edge = 1
+	}
+	for i := 0; i < IDLength - (leaf.exponent / 8) - edge; i++ {
 		info += fmt.Sprintf("%08b", leaf.prefix[i])
 	}
-	i++
-	for j := 0; j < (8 - (leaf.exponent %8)); j++ {
-		info += fmt.Sprintf("%01b", leaf.prefix[i] >> uint(j)) 
+	if(i != 0){
+	i++}
+	if(leaf.exponent % 8 != 0){
+		for j := 1; j <= (8 - (leaf.exponent %8)); j++ {
+			info += fmt.Sprintf("%01b", leaf.prefix[i] >> uint(8-j)) 
+		}
 	}
 	info += "\n"
 	return tabs + info
