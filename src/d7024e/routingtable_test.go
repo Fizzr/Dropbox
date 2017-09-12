@@ -51,3 +51,13 @@ func TestRoutingTable(t *testing.T) {
 	
 	fmt.Printf("%T, %T, %T \n", rt.root.(*Branch).left, rt.root, rt.root.(*Branch).right)
 }
+
+
+// Test Function to check Distance between 2 Nodes.
+func TestDistFunc(t *testing.T) {
+
+	DistT1 := NewKademliaID(testList[0])
+	DistT2 := NewKademliaID(testList[5])
+	DistBetween := DistT2.CalcDistance(DistT1)
+	fmt.Println(DistBetween)
+}
