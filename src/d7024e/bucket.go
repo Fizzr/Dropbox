@@ -2,8 +2,10 @@ package d7024e
 
 import (
 	"container/list"
-	"fmt"
+	//"fmt"
 )
+
+const bucketSize = 5
 
 type bucket struct {
 	list *list.List
@@ -28,15 +30,15 @@ func (bucket *bucket) AddContact(contact Contact) bool{
 	if element == nil {
 		if bucket.list.Len() < bucketSize {
 			bucket.list.PushFront(contact)
-			fmt.Println("Added contact to bucket")
+			//fmt.Println("Added contact to bucket")
 			return true
 		} else {
-			fmt.Println("Discarding contact")
+			//fmt.Println("Discarding contact")
 			return false
 		}
 	} else {
 		bucket.list.MoveToFront(element)
-		fmt.Println("Moved contact to top")
+		//fmt.Println("Moved contact to top")
 		return true
 	}
 }

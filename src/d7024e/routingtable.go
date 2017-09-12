@@ -5,13 +5,13 @@ import (
 	"fmt"
 )
 
-const bucketSize = 5
 var myID KademliaID
 var myBucketID int
 
 type Node interface {
 	getBucketFor(KademliaID) *bucket
 	addContact(Contact) bool
+	getClosestContact(target KademliaID, count int) []CloseContact
 }
 
 type Branch struct{
@@ -75,9 +75,10 @@ func (branch *Branch) addContact(contact Contact) bool {
 		var rightID int = ((int(myBitAtExponent)-1) * -1)	+ oldID	//if 1, becomes 0. If 0, becomes 1
 		var leftPrefix, rightPrefix [20]byte = prefix, prefix
 		var IDindex int = (IDLength - 1) - (splitExponent/8)
-		leftPrefix[IDindex] = leftPrefix[IDindex] ^ (1 << uint(splitExponent%8))
+		leftPrefix[IDindex] = leftPrefix[IDindex] | (1 << uint(splitExponent%8))
 		var left Leaf = Leaf{leftPrefix, splitExponent, leftID, &(buckets[1])}
 		var right Leaf = Leaf{rightPrefix, splitExponent, rightID, &(buckets[0])}
+		//fmt.Printf("My bit at %d: %d, leftID %d, rightID %d\n",branch.exponent, myBitAtExponent, leftID, rightID)
 
 		
 		/*
@@ -102,6 +103,10 @@ func (branch *Branch) addContact(contact Contact) bool {
 			return branch.right.addContact(contact)
 		}
 	}
+}
+
+func (branch *Branch) getClosestContact(target KademliaID, count int) []CloseContact{
+	return nil
 }
 
 func (branch *Branch) String() string{
@@ -165,6 +170,10 @@ func (leaf *Leaf) addContact(contact Contact) bool {
 	return leaf.buck.AddContact(contact)
 }
 
+func (leaf *Leaf) getClosestContact(target KademliaID, count int) []CloseContact{
+	return nil
+}
+
 type RoutingTable struct {
 	me Contact
 	root Node
@@ -201,11 +210,11 @@ func (routingTable *RoutingTable) AddContact(contact Contact) {
 		var rightID int = (int(myBitAtExponent)-1) * -1		//if 1, becomes 0. If 0, becomes 1
 		var leftPrefix, rightPrefix [20]byte
 		leftPrefix[0] = 1 << uint(splitExponent%8)
-		left = Leaf{leftPrefix, splitExponent, leftID, &(buckets[1])}
-		right = Leaf{rightPrefix, splitExponent, rightID, &(buckets[0])}
-
-		fmt.Printf("Root split left prefix! %b\n", left.prefix)
-		
+		left = Leaf{leftPrefix, splitExponent-1, leftID, &(buckets[1])}
+		right = Leaf{rightPrefix, splitExponent-1, rightID, &(buckets[0])}
+		myBucketID = 1
+		//fmt.Printf("Root split left prefix! %b\n", left.prefix)
+		//fmt.Printf("My bit at 160: %d, leftID %d, rightID %d\n", myBitAtExponent, leftID, rightID)
 		
 		/*/Can be made neater!
 		if(myBitAtExponent == 1){
@@ -215,7 +224,7 @@ func (routingTable *RoutingTable) AddContact(contact Contact) {
 			left = Leaf{1 << uint(splitExponent), splitExponent , 0, &(buckets[1])}
 			right = Leaf{0, splitExponent, 1, &(buckets[0])}
 		}*/
-		var newBranch Branch = Branch{routingTable.root.(*Leaf).prefix, IDBits, &left, &right}
+		var newBranch Branch = Branch{routingTable.root.(*Leaf).prefix, splitExponent, &left, &right}
 		routingTable.root = &newBranch
 		routingTable.root.addContact(contact)
 	}

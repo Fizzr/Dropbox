@@ -11,6 +11,11 @@ type Contact struct {
 	distance *KademliaID
 }
 
+type CloseContact struct{
+	contact Contact
+	distance *KademliaID
+}
+
 func NewContact(id *KademliaID, address string) Contact {
 	return Contact{id, address, nil}
 }

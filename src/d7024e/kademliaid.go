@@ -12,7 +12,8 @@ const IDBits = IDLength * 8
 type KademliaID [IDLength]byte
 
 func NewKademliaID(data string) *KademliaID {
-	decoded, _ := hex.DecodeString(data)
+	var decoded []byte
+	decoded, _ = hex.DecodeString(data)
 
 	newKademliaID := KademliaID{}
 	for i := 0; i < IDLength; i++ {
@@ -60,13 +61,24 @@ func (kademliaID *KademliaID) String() string {
 	return hex.EncodeToString(kademliaID[0:IDLength])
 }
 
+func (kademliaID *KademliaID) toBinary() string {
+	var result string
+	for i := 0; i < IDLength; i++ {
+		result += fmt.Sprintf("%08b", kademliaID[i])
+	}
+	return result
+}
+
 func (ID KademliaID) bitAt(exponent int) byte {
 	//fmt.Println(ID)
-	exponent = exponent/8
+	//exponent = exponent/8 //from bit to byte
 	var IDIndex, expBy8, expMod8 int
 	expBy8 = exponent/8
-	IDIndex = (IDLength-1) - expBy8
 	expMod8 = exponent%8
+	if(expMod8 == 0 && exponent != 0){
+		expBy8 -= 1
+	}
+	IDIndex = (IDLength-1) - expBy8
 	defer func() {
         if r := recover(); r != nil {
             fmt.Printf("Recovered. exponent: %v expBy8: %v IDIndex: %v expMod8: %v\n ID: %v\n", exponent, expBy8, IDIndex, expMod8, ID)
