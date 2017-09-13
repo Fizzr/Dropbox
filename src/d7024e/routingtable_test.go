@@ -8,7 +8,7 @@ import (
 )
 
 var testList []string = []string{
-	"FA10BAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA1",
+	"F010BAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA1",
 	"0011111400000000000000000000000000000000",
 	"F001111400000000000000000000000000000000",
 	"0111111400000000000000000000000000000000",
@@ -100,6 +100,31 @@ func strToByte(str string) byte{
 	}
 	return 0x0
 }
+
+
+func TestSplitOn(t *testing.T){
+	var b *bucket = newBucket()
+	for i := 0; i < bucketSize/2; i ++{
+		b.AddContact(NewContact(NewKademliaID(fmt.Sprintf("A%039X", i)), ""))
+	}
+	for i := 0; i < bucketSize/2; i ++{
+		b.AddContact(NewContact(NewKademliaID(fmt.Sprintf("0%039X", i)), ""))
+	}
+	var pass bool = true
+	var	 bucks [2]bucket = b.splitOn(159)
+	for e := bucks[0].list.Front(); e != nil; e = e.Next() {
+		pass = pass && e.Value.(Contact).ID.bitAt(159) == 0
+	}
+	for e := bucks[1].list.Front(); e != nil; e = e.Next() {
+		pass = pass && e.Value.(Contact).ID.bitAt(159) == 1
+	}
+	if(pass){
+		fmt.Println("Success - bucket splitOn")
+	}else{
+		t.Fail()
+	}
+
+}
 	
 func TestRoutingTable(t *testing.T) {
 	var c Contact = NewContact(NewKademliaID(testList[0]), "localhost:8000")
@@ -127,8 +152,8 @@ func TestRoutingTable(t *testing.T) {
 		for j:= 0; j < bucketSize; j++{
 			var tail string = randomHex(after)
 			var address string = start + fmt.Sprintf("%01X", active) + tail
-			id := NewKademliaID(address)
-			fmt.Println(id.toBinary())
+			//id := NewKademliaID(address)
+			//fmt.Println(id.toBinary())
 			rt.AddContact(NewContact(NewKademliaID(address), fmt.Sprintf("localhost:8%03d", j+(levels*bucketSize))))
 		}
 	}

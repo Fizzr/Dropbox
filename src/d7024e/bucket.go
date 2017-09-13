@@ -48,7 +48,7 @@ func (buck *bucket) splitOn(exponent int) [2]bucket{
 	for e:= buck.list.Front(); e != nil; e = e.Next() {
 		var c Contact = e.Value.(Contact)
 		//If bit at exponent is 1, push to bucket at 1. If exponent is 0, push to bucket at 0
-		bucketList[(c.ID[(IDLength-1)- (exponent/8)] >> uint((exponent%8)-1)) & 1].list.PushBack(c)
+		bucketList[c.ID.bitAt(exponent)].list.PushBack(c)
 	}
 	return bucketList
 }

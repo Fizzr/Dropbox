@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-var myID KademliaID
+var myID *KademliaID
 var myBucketID int
 
 type Node interface {
@@ -44,7 +44,8 @@ func (branch *Branch) getBucketFor(ID KademliaID) *bucket{
 func (branch *Branch) addContact(contact Contact) bool {
 	//fmt.Printf("Branch add, exp %d\n", branch.exponent)
 	var ok, isLeft bool
-	isLeft = contact.ID.bitAt(branch.exponent) == 1//branch.isOne(*contact.ID)
+	//fmt.Println(contact.ID.bitAt(branch.exponent))
+	isLeft = contact.ID.bitAt(branch.exponent) == 1
 	if(isLeft){
 		ok = branch.left.addContact(contact)
 	} else {
@@ -62,23 +63,27 @@ func (branch *Branch) addContact(contact Contact) bool {
 			leaf = branch.right.(*Leaf)
 		}
 		if(leaf.ID != myBucketID){
+		
+			//fmt.Printf("Not my buckedent! Leaf %d, Mine %d\n", leaf.ID, myBucketID)
 			return true;	// We don't wanna split. Return true, cos everything is just fine!
 		}
 		
-		var splitExponent int = branch.exponent-2
+		var splitExponent int = leaf.exponent
 		var buckets [2]bucket = leaf.buck.splitOn(splitExponent)
 		var oldID int = leaf.ID
 		var prefix [20]byte = leaf.prefix
 		
 		var myBitAtExponent byte = myID.bitAt(splitExponent)
+		//fmt.Println(myID.toBinary())
 		var leftID int = int(myBitAtExponent) + oldID
 		var rightID int = ((int(myBitAtExponent)-1) * -1)	+ oldID	//if 1, becomes 0. If 0, becomes 1
 		var leftPrefix, rightPrefix [20]byte = prefix, prefix
 		var IDindex int = (IDLength - 1) - (splitExponent/8)
 		leftPrefix[IDindex] = leftPrefix[IDindex] | (1 << uint(splitExponent%8))
-		var left Leaf = Leaf{leftPrefix, splitExponent, leftID, &(buckets[1])}
-		var right Leaf = Leaf{rightPrefix, splitExponent, rightID, &(buckets[0])}
-		//fmt.Printf("My bit at %d: %d, leftID %d, rightID %d\n",branch.exponent, myBitAtExponent, leftID, rightID)
+		var left Leaf = Leaf{leftPrefix, splitExponent-1, leftID, &(buckets[1])}
+		var right Leaf = Leaf{rightPrefix, splitExponent-1, rightID, &(buckets[0])}
+		//fmt.Printf("My bit at %d: %d, leftID %d, rightID %d\n",splitExponent, int(myBitAtExponent), leftID, rightID)
+		//fmt.Printf("Branch exponent: %d, splitExponent: %d, newLeafExponent %d\n", branch.exponent, splitExponent, splitExponent-1)
 
 		
 		/*
@@ -90,7 +95,7 @@ func (branch *Branch) addContact(contact Contact) bool {
 			right = Leaf{prefix, splitExponent, oldID + 1, &(buckets[0])}
 		}*/
 		myBucketID = oldID +1
-		var newBranch Branch = Branch{prefix, splitExponent+1, &left, &right}
+		var newBranch Branch = Branch{prefix, splitExponent, &left, &right}
 		if(isLeft){
 			//fmt.Printf("what used to be left? %T\n", branch.left)
 			branch.left = &newBranch
@@ -142,7 +147,7 @@ func (leaf *Leaf) String() string{
 	for i := 0; i < IDBits - leaf.exponent; i++ {
 		tabs += "\t"
 	}
-	info = fmt.Sprintf("ID: %v, Number of entries: %v Exponent: %v Prefix: ", leaf.ID, leaf.buck.Len(), leaf.exponent )//,IDBits -leaf.exponent , leaf.prefix) //>> uint(leaf.exponent))
+	info = fmt.Sprintf("ID: %v, Number of entries: %v Exponent: %v Prefix: ", leaf.ID, leaf.buck.Len(), leaf.exponent )
 	var i, edge int
 	if(leaf.exponent%8 != 0){
 		edge = 1
@@ -158,7 +163,11 @@ func (leaf *Leaf) String() string{
 		}
 	}
 	info += "\n"
-	return tabs + info
+	var content string
+	for e := leaf.buck.list.Front(); e != nil; e = e.Next() {
+		content += fmt.Sprintf("%s%s\n",tabs, e.Value.(Contact))
+	}
+	return tabs + info + content
 }
 
 func (leaf *Leaf) getBucketFor(_ KademliaID) *bucket{
@@ -187,8 +196,9 @@ func NewRoutingTable(me Contact) *RoutingTable {
 	}
 	routingTable.me = me
 	myBucketID = 0
+	myID = me.ID
 	var prefix [20]byte
-	routingTable.root = &Leaf{prefix,IDBits, 0, newBucket()}
+	routingTable.root = &Leaf{prefix,IDBits-1, 0, newBucket()}
 	routingTable.root.addContact(me)
 	return routingTable
 }
@@ -214,7 +224,7 @@ func (routingTable *RoutingTable) AddContact(contact Contact) {
 		right = Leaf{rightPrefix, splitExponent-1, rightID, &(buckets[0])}
 		myBucketID = 1
 		//fmt.Printf("Root split left prefix! %b\n", left.prefix)
-		//fmt.Printf("My bit at 160: %d, leftID %d, rightID %d\n", myBitAtExponent, leftID, rightID)
+		//fmt.Printf("My bit at %d: %d, leftID %d, rightID %d\n", splitExponent, myBitAtExponent, leftID, rightID)
 		
 		/*/Can be made neater!
 		if(myBitAtExponent == 1){
