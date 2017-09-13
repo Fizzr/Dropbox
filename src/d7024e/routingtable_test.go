@@ -8,7 +8,7 @@ import (
 )
 
 var testList []string = []string{
-	"F010BAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA1",
+	"FFFFBAAAAAAAAAAAAAA555555555555555555551",
 	"0011111400000000000000000000000000000000",
 	"F001111400000000000000000000000000000000",
 	"0111111400000000000000000000000000000000",
@@ -31,22 +31,36 @@ var testList []string = []string{
 	"E111111300000000000000000000000000000000"}
 
 func TestKadmeliaIDbitAt(t *testing.T){
-	var ID *KademliaID = NewKademliaID(testList[0])
 	
-	var address string
-	var bits byte
-	for i := IDLength*8 -1; i >= 0; i--{
-		//fmt.Printf("%01b", c.ID.bitAt(i))
-		var num uint = uint(i % 8)
-		if(num == 0){
-			address = fmt.Sprintf("%s%01X", address, bits)
-			bits = 0x0
+	try := func (s string) bool {
+		var ID *KademliaID = NewKademliaID(s)
+		fmt.Println(ID.toBinary())
+		var address string
+		var bits byte
+		for i := IDLength*8 -1; i >= 0; i--{
+			fmt.Printf("%b", ID.bitAt(i))
+			var num uint = uint(i % 8)
+			if(num == 0){
+				address = fmt.Sprintf("%s%X", address, bits)
+				bits = 0x0
+			}
+			bits = bits | ID.bitAt(i) << num
+			
 		}
-		bits = bits | ID.bitAt(i) << num
-		
+		fmt.Printf("\n%s - calculated\n%s - should be\n", address, s)
+		if(address == s){
+			return true
+		}else {
+			return false
+		}
 	}
-//	fmt.Printf("\n%s\n", address)
-	if(address == testList[0]){
+	
+	var pass = true
+	pass = pass && try(testList[0])
+	pass = try(randomHex(40)) && pass
+	pass = try(randomHex(40)) && pass
+	pass = try(randomHex(40)) && pass 
+	if(pass){
 		fmt.Println("Success - KadmeliaID bitAt")
 	}else {
 		t.Fail()
@@ -130,7 +144,7 @@ func TestRoutingTable(t *testing.T) {
 	var c Contact = NewContact(NewKademliaID(testList[0]), "localhost:8000")
 	
 	rt := NewRoutingTable(c)
-	levels := 5 					//number of levels down we'll go
+	levels := 10 					//number of levels down we'll go
 	//var start string
 	for i:= 0; i < levels; i ++ {	// i = level we're at. i.e. what exponent we're differating on!
 		/*if(i%4 == 0){
@@ -173,7 +187,7 @@ func TestRoutingTable(t *testing.T) {
 	//	fmt.Println(contacts[i].String())
 	//}
 	fmt.Println("")
-	fmt.Println(rt.root)
+	//fmt.Println(rt.root)
 	fmt.Println("")
 	
 	fmt.Printf("%T, %T, %T \n", rt.root.(*Branch).left, rt.root, rt.root.(*Branch).right)

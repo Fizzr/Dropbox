@@ -116,24 +116,25 @@ func (branch *Branch) getClosestContact(target KademliaID, count int) []CloseCon
 
 func (branch *Branch) String() string{
 	var tabs, info, openBrack, closeBrack string
-	for i := 0; i < IDBits - branch.exponent; i++ {
+	
+	for i := 0; i < IDBits-1 - branch.exponent; i++ {
 		tabs += "\t"
 	}
 	info = tabs + fmt.Sprintf("Exponent %v, Prefix: ", branch.exponent)
-	var i, edge int
-	if(branch.exponent%8 != 0){
+	var i /*, edge*/ int
+	/*if(branch.exponent%8 != 0){
 		edge = 1
-	}
-	for i := 0; i < IDLength - (branch.exponent / 8) - edge; i++ {
+	}*/
+	for i := 0; i < IDLength-1 - (branch.exponent / 8) /*- edge*/; i++ {
 		info += fmt.Sprintf("%08b", branch.prefix[i])
 	}
-	if(i != 0){
-	i++}
-	if(branch.exponent % 8 != 0){
-		for j := 0; j < (8 - (branch.exponent %8)); j++ {
-			info += fmt.Sprintf("%01b", branch.prefix[i] >> uint(9-j)) 
+/*	if(i != 0){
+	i++}*/
+	//if(branch.exponent % 8 != 0){
+		for j := 7; j > branch.exponent % 8; j-- {
+			info += fmt.Sprintf("%b", (branch.prefix[i] >> uint(j)) & 1) //Apparently can't use width to limit length
 		}
-	}
+	//}
 	info += "\n"
 	openBrack = tabs + "{\n"
 	closeBrack = tabs + "}\n"
@@ -144,28 +145,28 @@ func (branch *Branch) String() string{
 func (leaf *Leaf) String() string{
 	
 	var tabs, info string
-	for i := 0; i < IDBits - leaf.exponent; i++ {
+	for i := 0; i < IDBits-1 - leaf.exponent; i++ {
 		tabs += "\t"
 	}
 	info = fmt.Sprintf("ID: %v, Number of entries: %v Exponent: %v Prefix: ", leaf.ID, leaf.buck.Len(), leaf.exponent )
-	var i, edge int
-	if(leaf.exponent%8 != 0){
+	var i/*, edge*/ int
+	/*if(leaf.exponent%8 != 0){
 		edge = 1
-	}
-	for i := 0; i < IDLength - (leaf.exponent / 8) - edge; i++ {
+	}*/
+	for i := 0; i < IDLength-1 - (leaf.exponent / 8)/* - edge*/; i++ {
 		info += fmt.Sprintf("%08b", leaf.prefix[i])
 	}
-	if(i != 0){
-	i++}
-	if(leaf.exponent % 8 != 0){
-		for j := 1; j <= (8 - (leaf.exponent %8)); j++ {
-			info += fmt.Sprintf("%01b", leaf.prefix[i] >> uint(8-j)) 
+/*	if(i != 0){
+	i++}*/
+	//if(leaf.exponent % 8 != 0){
+		for j := 7; j > leaf.exponent % 8; j-- {
+			info += fmt.Sprintf("%b", (leaf.prefix[i] >> uint(j)) & 1) //Apparently can't use width to limit length
 		}
-	}
+	//}
 	info += "\n"
 	var content string
 	for e := leaf.buck.list.Front(); e != nil; e = e.Next() {
-		content += fmt.Sprintf("%s%s\n",tabs, e.Value.(Contact))
+		content += fmt.Sprintf("%s%s\n",tabs, e.Value.(Contact).ID.toBinary())
 	}
 	return tabs + info + content
 }
