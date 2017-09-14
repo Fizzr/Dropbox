@@ -28,7 +28,8 @@ type Leaf struct{
 }
 
 
-//Returns true if the bit of the KademliaID at the relevant exponent for this branch is 1, 
+//Returns true if the bit of the KademliaID at the relevant exponent for this branch is 1
+// confusing function. Consider purging in favour of bitAt
 func (branch *Branch) isOne(ID KademliaID) bool{
 	return ID.bitAt(branch.exponent) == 1
 }
@@ -120,19 +121,20 @@ func (branch *Branch) String() string{
 	for i := 0; i < IDBits-1 - branch.exponent; i++ {
 		tabs += "\t"
 	}
-	info = tabs + fmt.Sprintf("Exponent %v, Prefix: ", branch.exponent)
-	var i /*, edge*/ int
+	info = tabs + fmt.Sprintf("Branch - Exponent %v, Prefix: ", branch.exponent)
+	var /*i, edge*/ to int
 	/*if(branch.exponent%8 != 0){
 		edge = 1
 	}*/
-	for i := 0; i < IDLength-1 - (branch.exponent / 8) /*- edge*/; i++ {
+	to = IDLength-1 - (branch.exponent / 8)
+	for i := 0; i < to /*- edge*/; i++ {
 		info += fmt.Sprintf("%08b", branch.prefix[i])
 	}
-/*	if(i != 0){
-	i++}*/
+	//if(i != 0){
+	//i++}
 	//if(branch.exponent % 8 != 0){
 		for j := 7; j > branch.exponent % 8; j-- {
-			info += fmt.Sprintf("%b", (branch.prefix[i] >> uint(j)) & 1) //Apparently can't use width to limit length
+			info += fmt.Sprintf("%b", (branch.prefix[to] >> uint(j)) & 1) //Apparently can't use width to limit length
 		}
 	//}
 	info += "\n"
@@ -148,19 +150,20 @@ func (leaf *Leaf) String() string{
 	for i := 0; i < IDBits-1 - leaf.exponent; i++ {
 		tabs += "\t"
 	}
-	info = fmt.Sprintf("ID: %v, Number of entries: %v Exponent: %v Prefix: ", leaf.ID, leaf.buck.Len(), leaf.exponent )
-	var i/*, edge*/ int
+	info = fmt.Sprintf("Leaf - ID: %v, Number of entries: %v Exponent: %v Prefix: ", leaf.ID, leaf.buck.Len(), leaf.exponent )
+	var /*i, edge*/ to int
 	/*if(leaf.exponent%8 != 0){
 		edge = 1
 	}*/
-	for i := 0; i < IDLength-1 - (leaf.exponent / 8)/* - edge*/; i++ {
+	to = IDLength-1 - (leaf.exponent / 8)
+	for i := 0; i < to/* - edge*/; i++ {
 		info += fmt.Sprintf("%08b", leaf.prefix[i])
 	}
 /*	if(i != 0){
 	i++}*/
 	//if(leaf.exponent % 8 != 0){
 		for j := 7; j > leaf.exponent % 8; j-- {
-			info += fmt.Sprintf("%b", (leaf.prefix[i] >> uint(j)) & 1) //Apparently can't use width to limit length
+			info += fmt.Sprintf("%b", (leaf.prefix[to] >> uint(j)) & 1) //Apparently can't use width to limit length
 		}
 	//}
 	info += "\n"
@@ -204,7 +207,7 @@ func NewRoutingTable(me Contact) *RoutingTable {
 	return routingTable
 }
 
-func (routingTable *RoutingTable) AddContact(contact Contact) {
+func (routingTable *RoutingTable) AddContact(contact Contact) bool {
 	//fmt.Println("rt add")
 	//bucketIndex := routingTable.getBucketIndex(contact.ID)
 	//buck := routingTable.buckets[bucketIndex]
@@ -237,8 +240,8 @@ func (routingTable *RoutingTable) AddContact(contact Contact) {
 		}*/
 		var newBranch Branch = Branch{routingTable.root.(*Leaf).prefix, splitExponent, &left, &right}
 		routingTable.root = &newBranch
-		routingTable.root.addContact(contact)
-	}
+		return routingTable.root.addContact(contact)
+	}else {return true}
 	
 }
 

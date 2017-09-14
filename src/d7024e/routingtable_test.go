@@ -30,6 +30,8 @@ var testList []string = []string{
 	"D111111300000000000000000000000000000000",
 	"E111111300000000000000000000000000000000"}
 	
+	
+//Test functions for branches and leafes for use in TestRoutingTable
 func (branch *Branch) verifyFullTree(i int) int {
 	var left, right int
 	//to get around the fact that I can't define functions for interfaces here
@@ -45,14 +47,44 @@ func (branch *Branch) verifyFullTree(i int) int {
 		case *Branch:
 			right = a.verifyFullTree(i+1)
 	}
-	if(left == -1){return -1)
-	if(right == -1){return -1)
-	if(left > right){return left} else {return right}
+	if(left == -1){return -1}
+	if(right == -1){return -1}
+	var big, small int
+	if(left > right){
+		big, small = left, right
+	} else {
+		big, small = right, left
+	}
+	if(small - i != 1){
+		fmt.Printf("Exp %v, big %v, small %v i %v\n", branch.exponent, big, small, i)
+		fmt.Println("Incorrect tree structure!")
+		return -1
+	} else {return big}
 }
 
 func (leaf *Leaf) verifyFullTree(i int) int {
-	
-	
+	if(leaf.buck.Len() != bucketSize){ 
+		if(leaf.buck.Len() == 1){
+			if fmt.Sprint(leaf.buck.list.Front().Value.(Contact).ID) == testList[0] {
+					return i
+			}
+		}
+		fmt.Printf("Not right length! Expected 1 or 5, got %v\n", leaf.buck.Len())
+		fmt.Printf("ID %v, Exp %v\n %v\n ", leaf.ID, leaf.exponent, leaf)
+		return -1
+		}
+	for e:= leaf.buck.list.Front(); e != nil; e = e.Next() {
+		var ID *KademliaID = e.Value.(Contact).ID
+		for i := IDBits-1; i > leaf.exponent; i--{
+			//fmt.Println(i)
+			var preIndex int = IDLength-1 - i/8
+			//fmt.Printf("bitAt: %v prefix: %v preIndex %v i %v shift %v\n", ID.bitAt(i), ((leaf.prefix[preIndex/8] >> uint(i%8)) & 1), preIndex, i, preIndex%8)
+			if (ID.bitAt(i)) != ((leaf.prefix[preIndex] >> uint(i%8)) & 1){
+				fmt.Printf("start of ID isn't identical to prefix. Exponent: %v bitAt: %v prefix bit: %v\nPrefix at %v\n",i, ID.bitAt(i), ((leaf.prefix[preIndex/8] >> uint(i%8)) & 1), ID.toBinary())
+				return -1
+			}
+		}  
+	}
 	return i
 }
 	
@@ -180,7 +212,7 @@ func TestRoutingTable(t *testing.T) {
 	var c Contact = NewContact(NewKademliaID(testList[0]), "localhost:8000")
 	
 	rt := NewRoutingTable(c)
-	levels := 10 					//number of levels down we'll go
+	levels := 153 					//number of levels down we'll go
 	//var start string
 	for i:= 0; i < levels; i ++ {	// i = level we're at. i.e. what exponent we're differating on!
 		/*if(i%4 == 0){
@@ -204,29 +236,20 @@ func TestRoutingTable(t *testing.T) {
 			var address string = start + fmt.Sprintf("%01X", active) + tail
 			//id := NewKademliaID(address)
 			//fmt.Println(id.toBinary())
-			rt.AddContact(NewContact(NewKademliaID(address), fmt.Sprintf("localhost:8%03d", j+(levels*bucketSize))))
+			if !rt.AddContact(NewContact(NewKademliaID(address), fmt.Sprintf("localhost:%s", 8000 + j+(i*bucketSize)))) {
+				fmt.Printf("Failed to add level %v, number %v\n", i, j)
+			}
 		}
 	}
 	
-	
-	/*for i := 0; i < len(testList); i++{
-		contact := NewContact(NewKademliaID(testList[i]), fmt.Sprintf("localhost:8%03d", i))
-		//var bits string
-		//for j := 0; j < IDLength; j++ {
-		//	bits += fmt.Sprintf("%08b", contact.ID[j])
-		//}
-		//fmt.Println(bits)
-		rt.AddContact(contact)
-	}*/
-	//contacts := rt.FindClosestContacts(NewKademliaID("2111111400000000000000000000000000000000"), 20)
-	//for i := range contacts {
-	//	fmt.Println(contacts[i].String())
-	//}
-	fmt.Println("")
-	fmt.Println(rt.root)
-	fmt.Println("")
-	
-	fmt.Printf("%T, %T, %T \n", rt.root.(*Branch).left, rt.root, rt.root.(*Branch).right)
+//	fmt.Println(rt.root)
+	var v int = rt.root.(*Branch).verifyFullTree(1)
+	if(v != levels+1){
+		if (v != -1){fmt.Printf("Expected height %v, got %v\n", levels+1, v)}
+		t.Fail()
+	}else {
+		fmt.Println("Success - RoutingTable")
+	}
 }
 
 
