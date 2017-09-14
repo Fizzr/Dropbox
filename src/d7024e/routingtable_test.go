@@ -8,7 +8,7 @@ import (
 )
 
 var testList []string = []string{
-	"FFFFBAAAAAAAAAAAAAA555555555555555555551",
+	"A82FBAAAAAAAAAAAAAA555555555555555555551",
 	"0011111400000000000000000000000000000000",
 	"F001111400000000000000000000000000000000",
 	"0111111400000000000000000000000000000000",
@@ -29,26 +29,62 @@ var testList []string = []string{
 	"C111111200000000000000000000000000000000",
 	"D111111300000000000000000000000000000000",
 	"E111111300000000000000000000000000000000"}
+	
+func (branch *Branch) verifyFullTree(i int) int {
+	var left, right int
+	//to get around the fact that I can't define functions for interfaces here
+	switch a := branch.left.(type){	
+		case *Leaf:
+			left = a.verifyFullTree(i+1)
+		case *Branch:
+			left = a.verifyFullTree(i+1)
+	}
+	switch a := branch.right.(type){
+		case *Leaf:
+			right = a.verifyFullTree(i+1)
+		case *Branch:
+			right = a.verifyFullTree(i+1)
+	}
+	if(left == -1){return -1)
+	if(right == -1){return -1)
+	if(left > right){return left} else {return right}
+}
 
+func (leaf *Leaf) verifyFullTree(i int) int {
+	
+	
+	return i
+}
+	
 func TestKadmeliaIDbitAt(t *testing.T){
+	
+	//a := NewKademliaID(testList[0])
+	//for i := 88; i < 95; i++{
+	//	fmt.Printf("%b", a.bitAt(i))
+	//}
+	//fmt.Printf("\n%s\n", a.toBinary()[88:95])
 	
 	try := func (s string) bool {
 		var ID *KademliaID = NewKademliaID(s)
-		fmt.Println(ID.toBinary())
+		var address string
+		for i := IDBits-1; i >= 0; i-- {
+			address = address + fmt.Sprintf("%b", ID.bitAt(i))
+		}
+		/*fmt.Println(ID.toBinary())
 		var address string
 		var bits byte
 		for i := IDLength*8 -1; i >= 0; i--{
 			fmt.Printf("%b", ID.bitAt(i))
 			var num uint = uint(i % 8)
 			if(num == 0){
-				address = fmt.Sprintf("%s%X", address, bits)
-				bits = 0x0
+				address = fmt.Sprintf("%s%02X", address, bits)
+				bits = 0x00
 			}
 			bits = bits | ID.bitAt(i) << num
 			
 		}
-		fmt.Printf("\n%s - calculated\n%s - should be\n", address, s)
-		if(address == s){
+		fmt.Printf("\n%s - calculated\n%s - should be\n", address, s)*/
+		if(address == ID.toBinary()){
 			return true
 		}else {
 			return false
@@ -187,7 +223,7 @@ func TestRoutingTable(t *testing.T) {
 	//	fmt.Println(contacts[i].String())
 	//}
 	fmt.Println("")
-	//fmt.Println(rt.root)
+	fmt.Println(rt.root)
 	fmt.Println("")
 	
 	fmt.Printf("%T, %T, %T \n", rt.root.(*Branch).left, rt.root, rt.root.(*Branch).right)

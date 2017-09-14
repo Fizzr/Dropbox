@@ -80,9 +80,9 @@ func (ID KademliaID) bitAt(exponent int) byte {
 	var IDIndex, expBy8, expMod8 int
 	expBy8 = exponent/8
 	expMod8 = exponent%8
-	if(expMod8 == 0 && exponent != 0){
-		expBy8 -= 1
-	}
+	//if(expMod8 == 0 && exponent != 0){
+	//	expBy8 -= 1
+	//}
 	IDIndex = (IDLength-1) - expBy8
 	defer func() {
         if r := recover(); r != nil {
