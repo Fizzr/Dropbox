@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 	"math/rand"
+	"math"
 	//"encoding/hex"
 )
 
@@ -69,7 +70,7 @@ func (leaf *Leaf) verifyFullTree(i int) int {
 					return i
 			}
 		}
-		fmt.Printf("Not right length! Expected 1 or 5, got %v\n", leaf.buck.Len())
+		fmt.Printf("Not right length! Expected 1 or %d, got %v\n", bucketSize, leaf.buck.Len())
 		fmt.Printf("ID %v, Exp %v\n %v\n ", leaf.ID, leaf.exponent, leaf)
 		return -1
 		}
@@ -87,14 +88,19 @@ func (leaf *Leaf) verifyFullTree(i int) int {
 	}
 	return i
 }
+
+
+const letters = "0123456789ABCDEF"
+
+func randomHex(n int) string{
+    b := make([]byte, n)
+    for i := range b {
+        b[i] = letters[rand.Intn(len(letters))]
+    }
+    return string(b)
+}
 	
 func TestKadmeliaIDbitAt(t *testing.T){
-	
-	//a := NewKademliaID(testList[0])
-	//for i := 88; i < 95; i++{
-	//	fmt.Printf("%b", a.bitAt(i))
-	//}
-	//fmt.Printf("\n%s\n", a.toBinary()[88:95])
 	
 	try := func (s string) bool {
 		var ID *KademliaID = NewKademliaID(s)
@@ -125,9 +131,11 @@ func TestKadmeliaIDbitAt(t *testing.T){
 	
 	var pass = true
 	pass = pass && try(testList[0])
-	pass = try(randomHex(40)) && pass
-	pass = try(randomHex(40)) && pass
-	pass = try(randomHex(40)) && pass 
+	
+	for i := 0; i < 160; i++ {
+		pass = pass && try(randomHex(40))
+	}
+	
 	if(pass){
 		fmt.Println("Success - KadmeliaID bitAt")
 	}else {
@@ -135,15 +143,48 @@ func TestKadmeliaIDbitAt(t *testing.T){
 	}
 }
 
-const letters = "0123456789ABCDEF"
 
-func randomHex(n int) string{
-    b := make([]byte, n)
-    for i := range b {
-        b[i] = letters[rand.Intn(len(letters))]
-    }
-    return string(b)
+func TestSplitOn(t *testing.T){
+	try := func(exponent int) bool {
+		var b *bucket = newBucket()
+		for i := 0; i < bucketSize/2; i ++{
+			//b.AddContact(NewContact(NewKademliaID(fmt.Sprintf("%s%d%s", randomHex((IDLength*2)- 1 - exponent/4), int(math.Pow(2,float64(exponent%4))), randomHex(exponent/4))), ""))
+			b.AddContact(NewContact(NewKademliaID(fmt.Sprintf("%0s%d%0s", randomHex((IDLength*2)- 1 - exponent/4), int(math.Pow(2,float64(exponent%4))), randomHex(exponent/4))), ""))
+		}
+		for i := 0; i < bucketSize/2; i ++{
+			b.AddContact(NewContact(NewKademliaID(fmt.Sprintf("%s0%s", randomHex((IDLength*2)- 1 - exponent/4), randomHex(exponent/4))), ""))
+			//b.AddContact(NewContact(NewKademliaID(fmt.Sprintf("%040X", i)), ""))
+		}
+		var pass bool = true
+		var	 bucks [2]bucket = b.splitOn(exponent)
+		var num int = 0
+		for e := bucks[0].list.Front(); e != nil; e = e.Next() {
+			pass = pass && e.Value.(Contact).ID.bitAt(exponent) == 0
+			num ++
+		}
+		if(num != bucketSize/2){ pass = false }
+		num = 0
+		for e := bucks[1].list.Front(); e != nil; e = e.Next() {
+			pass = pass && e.Value.(Contact).ID.bitAt(exponent) == 1
+			num ++
+		}
+		if(num != bucketSize/2){ pass = false }
+		return pass
+	}
+	
+	pass := true
+	for i := 0; i < 160; i++ {
+		pass = pass && try(i)
+	}
+	
+	if(pass){
+		fmt.Println("Success - bucket splitOn")
+	}else{
+		t.Fail()
+	}
+
 }
+
 
 func strToByte(str string) byte{
 	switch str{
@@ -182,48 +223,19 @@ func strToByte(str string) byte{
 	}
 	return 0x0
 }
-
-
-func TestSplitOn(t *testing.T){
-	var b *bucket = newBucket()
-	for i := 0; i < bucketSize/2; i ++{
-		b.AddContact(NewContact(NewKademliaID(fmt.Sprintf("A%039X", i)), ""))
-	}
-	for i := 0; i < bucketSize/2; i ++{
-		b.AddContact(NewContact(NewKademliaID(fmt.Sprintf("0%039X", i)), ""))
-	}
-	var pass bool = true
-	var	 bucks [2]bucket = b.splitOn(159)
-	for e := bucks[0].list.Front(); e != nil; e = e.Next() {
-		pass = pass && e.Value.(Contact).ID.bitAt(159) == 0
-	}
-	for e := bucks[1].list.Front(); e != nil; e = e.Next() {
-		pass = pass && e.Value.(Contact).ID.bitAt(159) == 1
-	}
-	if(pass){
-		fmt.Println("Success - bucket splitOn")
-	}else{
-		t.Fail()
-	}
-
-}
 	
 func TestRoutingTable(t *testing.T) {
 	var c Contact = NewContact(NewKademliaID(testList[0]), "localhost:8000")
 	
 	rt := NewRoutingTable(c)
-	levels := 153 					//number of levels down we'll go
-	//var start string
+	levels := 152 					//number of levels down we'll go. Can't go too low,
+									// or we will get address space collisions, and won't be able to fill the tree.
+	
 	for i:= 0; i < levels; i ++ {	// i = level we're at. i.e. what exponent we're differating on!
-		/*if(i%4 == 0){
-			tmp := i/4
-			start += testList[0][tmp:tmp+1]
-			fmt.Println(start)
-		}*/
 		
 		var current, after, before int
 		before = i/4
-		after = 39 - before		//hexes after active hex
+		after = (IDBits/4)-1 - before		//hexes after active hex
 		current = before		//index of hex that's active
 		
 		var active byte = strToByte(testList[0][current:current+1])
@@ -236,13 +248,24 @@ func TestRoutingTable(t *testing.T) {
 			var address string = start + fmt.Sprintf("%01X", active) + tail
 			//id := NewKademliaID(address)
 			//fmt.Println(id.toBinary())
-			if !rt.AddContact(NewContact(NewKademliaID(address), fmt.Sprintf("localhost:%s", 8000 + j+(i*bucketSize)))) {
-				fmt.Printf("Failed to add level %v, number %v\n", i, j)
+			var ok, added = rt.AddContact(NewContact(NewKademliaID(address), fmt.Sprintf("localhost:%s", 8000 + j+(i*bucketSize))))
+			if ok {
+				if !added {
+					fmt.Printf("Failed to add number %d on level %d\n", j, i)
+				}
+			} else {
+				t.Error("AddContact returned false. Not supposed to happen!")
 			}
 		}
 	}
 	
-//	fmt.Println(rt.root)
+	//	fmt.Println(rt.root)
+	var a CloseContacts = rt.FindClosestContacts(NewKademliaID(testList[0]), 5)
+	fmt.Println(testList[0])
+	for i := 0; i < len(a); i++ {
+		fmt.Println(a[i].contact.ID)
+	}
+	fmt.Println(len(a))
 	var v int = rt.root.(*Branch).verifyFullTree(1)
 	if(v != levels+1){
 		if (v != -1){fmt.Printf("Expected height %v, got %v\n", levels+1, v)}
@@ -252,6 +275,17 @@ func TestRoutingTable(t *testing.T) {
 	}
 }
 
+func TestEquals(t *testing.T){
+	var address string = randomHex(40)
+	var ID1, ID2 *KademliaID
+	ID1 = NewKademliaID(address)
+	ID2 = NewKademliaID(address)
+	if(!ID1.Equals(ID2)){
+		t.Fail()
+	}else {
+		fmt.Println("Success - KademliaID Equals")
+	}
+}
 
 // Test Function to check Distance between 2 Nodes.
 func TestDistFunc(t *testing.T) {
@@ -259,5 +293,5 @@ func TestDistFunc(t *testing.T) {
 	DistT1 := NewKademliaID(testList[0])
 	DistT2 := NewKademliaID(testList[5])
 	DistBetween := DistT2.CalcDistance(DistT1)
-	fmt.Println(DistBetween)
+	fmt.Printf("%v\n",DistBetween)
 }
