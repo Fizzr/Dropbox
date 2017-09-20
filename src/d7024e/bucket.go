@@ -5,7 +5,7 @@ import (
 	//"fmt"
 )
 
-const bucketSize = 10
+const bucketSize = k
 
 type bucket struct {
 	list *list.List

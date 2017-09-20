@@ -12,7 +12,8 @@ func (network *Network) SendPingMessage(contact *Contact) {
 }
 
 func (network *Network) SendFindContactMessage(contact *Contact) {
-	// TODO
+	// Query for k contacts closest to contact target
+	// Should run synchronous (I guess)
 }
 
 func (network *Network) SendFindDataMessage(hash string) {

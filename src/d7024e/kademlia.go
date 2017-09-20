@@ -1,16 +1,63 @@
 package d7024e
 
-type Kademlia struct {
+import (
+	"sync"
+	"sort"
+)
+
+const k = 20
+const alpha = 3
+
+type MockNetwork struct {
+	
 }
 
-func (kademlia *Kademlia) LookupContact(target *Contact) {
-	// TODO
+func (mn *MockNetwork) SendFindContactMessage() *CloseContacts{
+	return nil
+}
+
+type Kademlia struct {
+	rt *RoutingTable
+	network *MockNetwork
+}
+
+func (kademlia *Kademlia) asyncLookup(target *KademliaID, potentials *CloseContacts, mutex sync.Mutex) {
+
+	 b :=(append(*potentials, *kademlia.network.SendFindContactMessage()...))
+	 potentials = &b
+	 sort.Sort(potentials)	 
+}
+
+func (kademlia *Kademlia) LookupContact(target *Contact) *Contact{
+	// Step 1. Get k closest to target
+	var potentials CloseContacts = kademlia.rt.FindClosestContacts(target.ID, k)
+	// Step 2. See if target exists. If so, return it
+	for i := 0; i < len(potentials); i++ {
+		if(potentials[i].contact.ID == target.ID){
+			return &(potentials[i].contact)
+		}
+	}
+	// Step 3. If not, send LookupContact to k closest contacts, including returned values, running alpha number of lookups in parallel
+	var mutex sync.Mutex = sync.Mutex{}
+	for i:= 0; i < alpha; i++ {
+		go kademlia.asyncLookup(target.ID, &potentials, mutex)
+	}
+	//wait for result here
+	// Step 4. If found, return contact.
+	return nil
 }
 
 func (kademlia *Kademlia) LookupData(hash string) {
-	// TODO
+	// Step 1.Look for data in own hashtable. If found, return
+	// Step 2. If not, Similar to lookupContact, Send lookupData request to k closest, running alpha number of lookups in parallel 
+	// (Step 2 makes sense if we call LookupData through console, but not if someone call it on us... Same for LookupData)
+	// Step 3.If file found, return it
 }
 
 func (kademlia *Kademlia) Store(data []byte) {
-	// TODO
+	// Hash data to get handle
+	// Store data in own file (I think?)
+	// Do lookup on data handle (I think?)
+	// Store data in k closest nodes (I think?)
+	// return handle
 }

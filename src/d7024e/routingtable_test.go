@@ -228,7 +228,7 @@ func TestRoutingTable(t *testing.T) {
 	var c Contact = NewContact(NewKademliaID(testList[0]), "localhost:8000")
 	
 	rt := NewRoutingTable(c)
-	levels := 152 					//number of levels down we'll go. Can't go too low,
+	levels := 130 					//number of levels down we'll go. Can't go too low,
 									// or we will get address space collisions, and won't be able to fill the tree.
 	
 	for i:= 0; i < levels; i ++ {	// i = level we're at. i.e. what exponent we're differating on!
