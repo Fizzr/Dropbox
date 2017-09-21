@@ -1,5 +1,12 @@
 package d7024e
 
+type Net interface {
+	SendPingMessage(contact *Contact)
+	SendFindContactMessage(contact *Contact) CloseContacts
+	SendFindDataMessage(hash string)
+	SendStoreMessage(data []byte)
+}
+
 type Network struct {
 }
 
