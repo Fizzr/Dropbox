@@ -1,0 +1,72 @@
+// See README.txt for information and build instructions.
+//
+// Note: START and END tags are used in comments to define sections used in
+// tutorials.  They are not part of the syntax for Protocol Buffers.
+//
+// To get an in-depth walkthrough of this file and the related examples, see:
+// https://developers.google.com/protocol-buffers/docs/tutorials
+
+syntax = "proto3";
+package messages;
+
+message message {
+	enum Type 
+	{
+		REQUEST  = 0;
+		RESPONSE = 1;
+	}
+	Type type = 1;
+	string senderID = 2;
+	string senderAddress = 3;
+	
+	request Request = 4;
+	response Response = 5;	
+}
+
+message request 
+{
+	enum Type 
+	{
+		PING		= 0;
+		FINDNODE	= 1;
+		FINDDATA	= 2;
+		STORE		= 3;
+		
+	}
+	Type type = 1;
+	string ID = 2;
+}
+
+message response 
+{
+	enum Type
+	{
+		PING 	= 0;
+		FINDNODE = 1;
+		FINDDATA_FOUND = 2;
+		FINDDATA_NODES = 3;
+		STORE = 4;
+	}
+	Type type = 1;
+	repeating string IDs = 2
+}
+
+message findClosest 
+{
+  string find = 1;
+}
+
+message ping 
+{
+
+}
+
+message findData
+{
+	string find = 1;
+}
+
+message store 
+{
+	string store = 1;
+}

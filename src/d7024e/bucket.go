@@ -5,7 +5,7 @@ import (
 	//"fmt"
 )
 
-const bucketSize = 5
+const bucketSize = k
 
 type bucket struct {
 	list *list.List
@@ -17,7 +17,7 @@ func newBucket() *bucket {
 	return bucket
 }
 
-func (bucket *bucket) AddContact(contact Contact) bool{
+func (bucket *bucket) AddContact(contact Contact) (bool, bool){
 	var element *list.Element
 	for e := bucket.list.Front(); e != nil; e = e.Next() {
 		nodeID := e.Value.(Contact).ID
@@ -31,15 +31,15 @@ func (bucket *bucket) AddContact(contact Contact) bool{
 		if bucket.list.Len() < bucketSize {
 			bucket.list.PushFront(contact)
 			//fmt.Println("Added contact to bucket")
-			return true
+			return true, true
 		} else {
 			//fmt.Println("Discarding contact")
-			return false
+			return false, false
 		}
 	} else {
 		bucket.list.MoveToFront(element)
 		//fmt.Println("Moved contact to top")
-		return true
+		return true, false
 	}
 }
 
@@ -53,13 +53,13 @@ func (buck *bucket) splitOn(exponent int) [2]bucket{
 	return bucketList
 }
 
-func (bucket *bucket) GetContactAndCalcDistance(target *KademliaID) []Contact {
-	var contacts []Contact
+func (bucket *bucket) GetContactAndCalcDistance(target *KademliaID) CloseContacts {
+	var contacts CloseContacts
 
 	for elt := bucket.list.Front(); elt != nil; elt = elt.Next() {
-		contact := elt.Value.(Contact)
-		contact.CalcDistance(target)
-		contacts = append(contacts, contact)
+		var contact Contact = elt.Value.(Contact)
+		var dist *KademliaID = contact.CalcDistance(target)
+		contacts = append(contacts, CloseContact{contact, dist})
 	}
 
 	return contacts

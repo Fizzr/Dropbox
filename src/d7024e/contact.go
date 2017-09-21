@@ -2,13 +2,11 @@ package d7024e
 
 import (
 	"fmt"
-	"sort"
 )
 
 type Contact struct {
 	ID       *KademliaID
 	Address  string
-	distance *KademliaID
 }
 
 type CloseContact struct{
@@ -16,46 +14,26 @@ type CloseContact struct{
 	distance *KademliaID
 }
 
+type CloseContacts []CloseContact
+
 func NewContact(id *KademliaID, address string) Contact {
-	return Contact{id, address, nil}
+	return Contact{id, address}
 }
 
-func (contact *Contact) CalcDistance(target *KademliaID) {
-	contact.distance = contact.ID.CalcDistance(target)
-}
-
-func (contact *Contact) Less(otherContact *Contact) bool {
-	return contact.distance.Less(otherContact.distance)
+func (contact *Contact) CalcDistance(target *KademliaID) *KademliaID{
+	return contact.ID.CalcDistance(target)
 }
 
 func (contact *Contact) String() string {
 	return fmt.Sprintf(`contact("%s", "%s")`, contact.ID, contact.Address)
 }
 
-type ContactCandidates struct {
-	contacts []Contact
+func (c CloseContacts) Len() int {
+	return len(c)
 }
-
-func (candidates *ContactCandidates) Append(contacts []Contact) {
-	candidates.contacts = append(candidates.contacts, contacts...)
+func (c CloseContacts) Swap(i, j int) {
+	c[i], c[j] = c[j], c[i]
 }
-
-func (candidates *ContactCandidates) GetContacts(count int) []Contact {
-	return candidates.contacts[:count]
-}
-
-func (candidates *ContactCandidates) Sort() {
-	sort.Sort(candidates)
-}
-
-func (candidates *ContactCandidates) Len() int {
-	return len(candidates.contacts)
-}
-
-func (candidates *ContactCandidates) Swap(i, j int) {
-	candidates.contacts[i], candidates.contacts[j] = candidates.contacts[j], candidates.contacts[i]
-}
-
-func (candidates *ContactCandidates) Less(i, j int) bool {
-	return candidates.contacts[i].Less(&candidates.contacts[j])
+func (c CloseContacts) Less(i, j int) bool {
+	return c[i].distance.Less(c[j].distance)
 }
