@@ -10,7 +10,7 @@ import (
 
 type Net interface {
 	SendPingMessage(contact *Contact)
-	SendFindContactMessage(contact *Contact) CloseContacts
+	SendFindContactMessage(contact *Contact, target *KademliaID) CloseContacts
 	SendFindDataMessage(hash string)
 	SendStoreMessage(data []byte)
 }

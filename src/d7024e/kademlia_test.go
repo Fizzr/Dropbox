@@ -3,9 +3,10 @@ package d7024e
 import (
 //	"messages"
 //	"net"
-//	"fmt"
+	"fmt"
 //	proto "github.com/golang/protobuf/proto"
 	"testing"
+	"sort"
 )
 
 type MockNetwork struct {
@@ -33,13 +34,15 @@ var lookList []string = []string{
 func (mn *MockNetwork) SendPingMessage(contact *Contact){
 	return
 }
-func (mn *MockNetwork) SendFindContactMessage(contact *Contact/*, target *KademliaID*/) CloseContacts{
+func (mn *MockNetwork) SendFindContactMessage(contact *Contact, target *KademliaID) CloseContacts{
 	for i := 0; i < len(lookList); i++ {
 		if contact.ID.String() == lookList[i] {
 			var res CloseContacts
 			for j := i; j < i+3 && j < len(lookList); j++ {
-				//append(res, CloseContact{NewContact})
+				var c Contact = NewContact(NewKademliaID(lookList[j]), "localhost")
+				res = append(res, CloseContact{c, c.ID.CalcDistance(target)})
 			}
+			sort.Sort(res)
 			return res
 		}
 	}
@@ -54,8 +57,12 @@ func (mn *MockNetwork) SendStoreMessage(data []byte) {
 
 func TestLookupContact(t *testing.T) {
 	var mn *MockNetwork = &MockNetwork{"localhost", 8001}
-	var base Contact = NewContact(NewKademliaID(testList[0]), "localhost:8001")
+	var base Contact = NewContact(NewKademliaID(lookList[0]), "localhost:8001")
 	var kad *Kademlia = NewKademlia("localhost:8001", mn, &base)
-	var look Contact = NewContact(NewKademliaID(testList[15]), "")
-	kad.LookupContact(&look)
+	var look Contact = NewContact(NewKademliaID(lookList[15]), "")
+	var cc CloseContacts = *kad.LookupContact(&look)
+	for i := 0; i < len(cc); i++ {
+		fmt.Println(cc[i].contact.ID)
+	}
+	
 }
