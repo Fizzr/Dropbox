@@ -13,6 +13,15 @@ type Kademlia struct {
 	network Net
 }
 
+func NewKademlia(address string, network Net, base *Contact) *Kademlia{
+	var c Contact = NewContact(NewKademliaID(randomHex(40)), "localghost")
+	var rt *RoutingTable = NewRoutingTable(c)
+	if(base != nil){
+		rt.AddContact(*base)
+	}
+	return &Kademlia{rt, network}
+}
+
 func (kademlia *Kademlia) asyncLookup(target *Contact, potentials *CloseContacts, mutex sync.Mutex) {
 	var a CloseContacts = kademlia.network.SendFindContactMessage(target)
 	b :=(append(*potentials, a...))

@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 package d7024e
 
 import (

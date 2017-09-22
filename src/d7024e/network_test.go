@@ -8,23 +8,6 @@ import (
 	"testing"
 )
 
-type MockNetwork struct {
-	ip string
-	port int
-}
-
-func (mn *MockNetwork) SendPingMessage(contact *Contact){
-	return
-}
-func (mn *MockNetwork) SendFindContactMessage(contact *Contact) CloseContacts{
-	return nil
-}
-func (mn *MockNetwork) SendFindDataMessage(hash string) {
-	return
-}
-func (mn *MockNetwork) SendStoreMessage(data []byte) {
-	return
-}
 func writeByte(address string, b []byte){
 	var laddr, raddr *net.UDPAddr
 
@@ -116,5 +99,4 @@ func TestProtobufNetwork(t *testing.T) {
 	}
 	fmt.Println("Success - Protobuf communication")
 	conn.Close()
-
 }
