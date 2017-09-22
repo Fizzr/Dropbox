@@ -48,35 +48,10 @@ func Listen(ip string, port int) {
 	}
 }
 
-func SendPingMessage() {
+func SendPingMessage(ip string, port int) {
 	// func (network *Network) SendPingMessage(contact *Contact)
-	ServerAddr, err := net.ResolveUDPAddr("udp", "localhost:8001")
-	CheckError(err)
-
-	LocalAddr, err := net.ResolveUDPAddr("udp", "localhost:0")
-	CheckError(err)
-
-	Conn, err := net.DialUDP("udp", LocalAddr, ServerAddr)
-	CheckError(err)
-
-	defer Conn.Close()
-
-	i := 0
-	for {
-		msg := strconv.Itoa(i)
-		i++
-		buf := []byte(msg)
-		_, err := Conn.Write(buf)
-		if err != nil {
-			fmt.Println(msg, err)
-		}
-		time.Sleep(time.Second * 1)
-	}
-}
-
-func SendPingMessage1() {
-	// func (network *Network) SendPingMessage(contact *Contact)
-	ServerAddr, err := net.ResolveUDPAddr("udp", "localhost:8002")
+	portconv := strconv.Itoa(port)
+	ServerAddr, err := net.ResolveUDPAddr("udp", ip+":"+portconv)
 	CheckError(err)
 
 	LocalAddr, err := net.ResolveUDPAddr("udp", "localhost:0")
