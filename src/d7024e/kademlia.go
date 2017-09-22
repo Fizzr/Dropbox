@@ -8,24 +8,25 @@ import (
 const k = 20
 const alpha = 3
 
-type MockNetwork struct {
-	
-}
-
-func (mn *MockNetwork) SendFindContactMessage() *CloseContacts{
-	return nil
-}
-
 type Kademlia struct {
 	rt *RoutingTable
-	network *MockNetwork
+	network Net
 }
 
-func (kademlia *Kademlia) asyncLookup(target *KademliaID, potentials *CloseContacts, mutex sync.Mutex) {
+func NewKademlia(address string, network Net, base *Contact) *Kademlia{
+	var c Contact = NewContact(NewKademliaID(randomHex(40)), "localghost")
+	var rt *RoutingTable = NewRoutingTable(c)
+	if(base != nil){
+		rt.AddContact(*base)
+	}
+	return &Kademlia{rt, network}
+}
 
-	 b :=(append(*potentials, *kademlia.network.SendFindContactMessage()...))
-	 potentials = &b
-	 sort.Sort(potentials)	 
+func (kademlia *Kademlia) asyncLookup(target *Contact, potentials *CloseContacts, mutex sync.Mutex) {
+	var a CloseContacts = kademlia.network.SendFindContactMessage(target)
+	b :=(append(*potentials, a...))
+	potentials = &b
+	sort.Sort(potentials)	 
 }
 
 func (kademlia *Kademlia) LookupContact(target *Contact) *Contact{
@@ -40,7 +41,7 @@ func (kademlia *Kademlia) LookupContact(target *Contact) *Contact{
 	// Step 3. If not, send LookupContact to k closest contacts, including returned values, running alpha number of lookups in parallel
 	var mutex sync.Mutex = sync.Mutex{}
 	for i:= 0; i < alpha; i++ {
-		go kademlia.asyncLookup(target.ID, &potentials, mutex)
+		go kademlia.asyncLookup(target, &potentials, mutex)
 	}
 	//wait for result here
 	// Step 4. If found, return contact.

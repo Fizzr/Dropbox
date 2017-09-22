@@ -15,27 +15,28 @@ type Node interface {
 	getClosestContacts(target *KademliaID, count int) CloseContacts
 }
 
-type Branch struct {
-	prefix   [20]byte
+type Branch struct{
+	prefix [20]byte
 	exponent int
-	left     Node
-	right    Node
+	left Node
+	right Node
 }
-type Leaf struct {
-	prefix   [20]byte
+type Leaf struct{
+	prefix [20]byte
 	exponent int
-	ID       int
-	buck     *bucket
+	ID int
+	buck *bucket
 }
+
 
 //Returns true if the bit of the KademliaID at the relevant exponent for this branch is 1
 // confusing function. Consider purging in favour of bitAt
-func (branch *Branch) isOne(ID KademliaID) bool {
+func (branch *Branch) isOne(ID KademliaID) bool{
 	return ID.bitAt(branch.exponent) == 1
 }
 
-func (branch *Branch) getBucketFor(ID KademliaID) *bucket {
-	if branch.isOne(ID) {
+func (branch *Branch) getBucketFor(ID KademliaID) *bucket{
+	if(branch.isOne(ID)){
 		return branch.left.getBucketFor(ID)
 	} else {
 		return branch.right.getBucketFor(ID)
@@ -58,7 +59,7 @@ func (branch *Branch) addContact(contact Contact) (bool, bool) {
 	} else { 
 		//fmt.Print("Splitting Leaf ")
 		var leaf *Leaf
-		if isLeft {
+		if(isLeft){
 			leaf = branch.left.(*Leaf)
 		} else {
 			leaf = branch.right.(*Leaf)
@@ -67,18 +68,18 @@ func (branch *Branch) addContact(contact Contact) (bool, bool) {
 			fmt.Println("HAHAHAH")
 			return true, false;	// We don't wanna split. Return true, cos everything is just fine!
 		}
-
+		
 		var splitExponent int = leaf.exponent
 		var buckets [2]bucket = leaf.buck.splitOn(splitExponent)
 		var oldID int = leaf.ID
 		var prefix [20]byte = leaf.prefix
-
+		
 		var myBitAtExponent byte = myID.bitAt(splitExponent)
 		//fmt.Println(myID.toBinary())
 		var leftID int = int(myBitAtExponent) + oldID
-		var rightID int = ((int(myBitAtExponent) - 1) * -1) + oldID //if 1, becomes 0. If 0, becomes 1
+		var rightID int = ((int(myBitAtExponent)-1) * -1)	+ oldID	//if 1, becomes 0. If 0, becomes 1
 		var leftPrefix, rightPrefix [20]byte = prefix, prefix
-		var IDindex int = (IDLength - 1) - (splitExponent / 8)
+		var IDindex int = (IDLength - 1) - (splitExponent/8)
 		leftPrefix[IDindex] = leftPrefix[IDindex] | (1 << uint(splitExponent%8))
 		var left Leaf = Leaf{leftPrefix, splitExponent-1, leftID, &(buckets[1])}
 		var right Leaf = Leaf{rightPrefix, splitExponent-1, rightID, &(buckets[0])}
@@ -114,10 +115,10 @@ func (branch *Branch) getClosestContacts(target *KademliaID, count int) CloseCon
 	}
 }
 
-func (branch *Branch) String() string {
+func (branch *Branch) String() string{
 	var tabs, info, openBrack, closeBrack string
-
-	for i := 0; i < IDBits-1-branch.exponent; i++ {
+	
+	for i := 0; i < IDBits-1 - branch.exponent; i++ {
 		tabs += "\t"
 	}
 	info = tabs + fmt.Sprintf("Branch - Exponent %v, Prefix: ", branch.exponent)
@@ -136,10 +137,11 @@ func (branch *Branch) String() string {
 	return info + openBrack + fmt.Sprint(branch.right) + closeBrack + openBrack + fmt.Sprint(branch.left) + closeBrack
 }
 
-func (leaf *Leaf) String() string {
 
+func (leaf *Leaf) String() string{
+	
 	var tabs, info string
-	for i := 0; i < IDBits-1-leaf.exponent; i++ {
+	for i := 0; i < IDBits-1 - leaf.exponent; i++ {
 		tabs += "\t"
 	}
 	info = fmt.Sprintf("Leaf - ID: %v, Number of entries: %v Exponent: %v\nPrefix:\n", leaf.ID, leaf.buck.Len(), leaf.exponent )
@@ -155,13 +157,13 @@ func (leaf *Leaf) String() string {
 	info += "\n-------\n"
 	var content string
 	for e := leaf.buck.list.Front(); e != nil; e = e.Next() {
-		content += fmt.Sprintf("%s%s\n", tabs, e.Value.(Contact).ID)
+		content += fmt.Sprintf("%s%s\n",tabs, e.Value.(Contact).ID.toBinary())
 	}
 	return tabs + info + content
 }
 
-func (leaf *Leaf) getBucketFor(_ KademliaID) *bucket {
-	return leaf.buck
+func (leaf *Leaf) getBucketFor(_ KademliaID) *bucket{
+	return leaf.buck;
 }
 
 func (leaf *Leaf) addContact(contact Contact) (bool, bool) {
@@ -180,13 +182,9 @@ func (leaf *Leaf) getClosestContacts(target *KademliaID, count int) CloseContact
 }
 
 type RoutingTable struct {
-	me      Contact
-	root    Node
+	me Contact
+	root Node
 	buckets [IDBits]*bucket
-}
-
-func (rt RoutingTable) String() string {
-	return fmt.Sprint(rt.root)
 }
 
 func NewRoutingTable(me Contact) *RoutingTable {
@@ -198,7 +196,7 @@ func NewRoutingTable(me Contact) *RoutingTable {
 	myBucketID = 0
 	myID = me.ID
 	var prefix [20]byte
-	routingTable.root = &Leaf{prefix, IDBits - 1, 0, newBucket()}
+	routingTable.root = &Leaf{prefix,IDBits-1, 0, newBucket()}
 	routingTable.root.addContact(me)
 	return routingTable
 }
@@ -208,16 +206,16 @@ func (routingTable *RoutingTable) AddContact(contact Contact) (bool, bool) {
 	var ok, added bool = routingTable.root.addContact(contact)
 	if(!ok){
 		var buckets [2]bucket
-		var splitExponent int = IDBits - 1
+		var splitExponent int = IDBits-1
 		buckets = routingTable.root.(*Leaf).buck.splitOn(splitExponent)
 		var left, right Leaf
 		var myBitAtExponent byte = routingTable.me.ID.bitAt(splitExponent)
 		var leftID int = int(myBitAtExponent)
-		var rightID int = (int(myBitAtExponent) - 1) * -1 //if 1, becomes 0. If 0, becomes 1
+		var rightID int = (int(myBitAtExponent)-1) * -1		//if 1, becomes 0. If 0, becomes 1
 		var leftPrefix, rightPrefix [20]byte
 		leftPrefix[0] = 1 << uint(splitExponent%8)
-		left = Leaf{leftPrefix, splitExponent - 1, leftID, &(buckets[1])}
-		right = Leaf{rightPrefix, splitExponent - 1, rightID, &(buckets[0])}
+		left = Leaf{leftPrefix, splitExponent-1, leftID, &(buckets[1])}
+		right = Leaf{rightPrefix, splitExponent-1, rightID, &(buckets[0])}
 		myBucketID = 1
 		var newBranch Branch = Branch{routingTable.root.(*Leaf).prefix, splitExponent, &left, &right}
 		routingTable.root = &newBranch

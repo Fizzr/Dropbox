@@ -8,6 +8,13 @@ import (
 	"time"
 )
 
+type Net interface {
+	SendPingMessage(contact *Contact)
+	SendFindContactMessage(contact *Contact) CloseContacts
+	SendFindDataMessage(hash string)
+	SendStoreMessage(data []byte)
+}
+
 type Network struct {
 }
 
