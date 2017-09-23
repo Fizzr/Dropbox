@@ -15,13 +15,63 @@ type Kademlia struct {
 	network Net
 }
 
-type potentials struct {
+type asyncStruct struct {
 	cc CloseContacts
 	searched CloseContacts
 	cond *sync.Cond
 	index int
 	activeThreads int
 	wg *sync.WaitGroup
+}
+
+func NewAsyncStruct(base CloseContacts) *asyncStruct{
+	var wg sync.WaitGroup
+	return &asyncStruct{base, nil, &sync.Cond{L: &sync.Mutex{}}, 0, 0, &wg}
+}
+
+func (as *asyncStruct) getNext() *CloseContact {
+	as.cond.L.Lock()
+	var c CloseContact
+	var checked bool = false
+	for !checked {
+		for len(as.cc) == 0 {
+			if as.activeThreads == 0 {		//No hope of getting new items.
+				as.cond.L.Unlock()
+				return nil					//No new item we haven't already checked. 
+			}
+			as.cond.Wait()		//Wait until other threads return with new information
+		}
+		c = as.cc[0]
+		as.cc = as.cc[1:]
+		for i:= 0; i < len(as.searched); i++ {					//Make sure we're not seaching one we already searched.
+			if c.contact.ID == as.searched[i].contact.ID {
+				continue
+			}
+		}
+		checked = true			//Checked through all searched items, didn't find duplicates
+	}
+	as.searched = append(as.searched, c)
+	var num int = as.index
+	as.index ++
+	if(num >= k) {
+		as.cond.Broadcast()
+		as.cond.L.Unlock()
+		return nil			//Already ran k times
+	}
+	
+	as.searched = append(as.searched, c)
+	as.activeThreads ++
+	as.cond.L.Unlock()
+	return &c
+}
+
+func (as *asyncStruct) addResult(res CloseContacts) {
+	as.cond.L.Lock()
+	as.cc = (append(as.cc, res...))
+	sort.Sort(as.cc)
+	as.activeThreads --
+	as.cond.Broadcast()
+	as.cond.L.Unlock()
 }
 
 func NewKademlia(address string, network Net, base *Contact) *Kademlia{
@@ -33,58 +83,16 @@ func NewKademlia(address string, network Net, base *Contact) *Kademlia{
 	return &Kademlia{rt, network}
 }
 
-func (kademlia *Kademlia) asyncLookup(target *Contact, pot *potentials) {
-	defer pot.wg.Done()
+func (kademlia *Kademlia) asyncLookup(target *Contact, as *asyncStruct) {
+	defer as.wg.Done()
 	for {
-		pot.cond.L.Lock()
-/*		for len(pot.cc) == 0 {
-			if pot.activeThreads == 0{	//No hope of getting new items.
-				pot.cond.L.Unlock()
-				return
-			}
-			pot.cond.Wait()		//Wait until other threads return with new information.
-		}*/
-		var c CloseContact
-		var checked bool = false
-		for !checked {
-			for len(pot.cc) == 0 {
-				if pot.activeThreads == 0 {		//No hope of getting new items.
-					pot.cond.L.Unlock()
-					return						//No new item we haven't already checked. 
-				}
-				pot.cond.Wait()		//Wait until other threads return with new information
-			}
-			c = pot.cc[0]
-			pot.cc = pot.cc[1:]
-			for i:= 0; i < len(pot.searched); i++ {					//Make sure we're not seaching one we already searched.
-				if c.contact.ID == pot.searched[i].contact.ID {
-					continue
-				}
-			}
-			checked = true			//Checked through all searched items, didn't find duplicates
-		}
-		pot.searched = append(pot.searched, c)
-		var num int = pot.index
-		pot.index ++
-		if(num >= k) {
-			pot.cond.Broadcast()
-			pot.cond.L.Unlock()
-			return 
-		}
+		var c *CloseContact = as.getNext()
+		if (c == nil) {return}
 		
-		pot.searched = append(pot.searched, c)
-		pot.activeThreads ++
-		pot.cond.L.Unlock()
-			
 		var a CloseContacts = kademlia.network.SendFindContactMessage(&c.contact, target.ID)
 		//Go through all the results, and spawn routines to add them to RT
 		
-		pot.cond.L.Lock()
-		pot.cc = (append(pot.cc, a...))
-		sort.Sort(pot.cc)
-		pot.activeThreads --
-		pot.cond.Broadcast()
-		pot.cond.L.Unlock()
+		as.addResult(a)
 	}
 }
 
@@ -98,17 +106,18 @@ func (kademlia *Kademlia) LookupContact(target *Contact) *CloseContacts{
 		}
 	}*/
 	// Step 3. If not, send LookupContact to k closest contacts, including returned values, running alpha number of lookups in parallel
-	var wg sync.WaitGroup
-	var pot *potentials = &potentials{cc, nil, &sync.Cond{L: &sync.Mutex{}}, 0, 0,&wg}
-	wg.Add(alpha)
+	//var wg sync.WaitGroup
+	//var as *asyncStruct = &asyncStruct{cc, nil, &sync.Cond{L: &sync.Mutex{}}, 0, 0,&wg}
+	var as *asyncStruct = NewAsyncStruct(cc)
+	as.wg.Add(alpha)
 	for i:= 0; i < alpha; i++ {
-		go kademlia.asyncLookup(target, pot)
+		go kademlia.asyncLookup(target, as)
 	}
 	//wait for result here
-	wg.Wait()
+	as.wg.Wait()
 	// Step 4. If found, return contact.
 	
-	var result CloseContacts = append(pot.cc, pot.searched...)
+	var result CloseContacts = append(as.cc, as.searched...)
 	sort.Sort(result)
 	for i:= 0; i < len(result)-1; i ++ {
 		if(result[i].contact.ID.Equals(result[i+1].contact.ID)) {
