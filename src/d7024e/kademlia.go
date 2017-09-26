@@ -11,7 +11,7 @@ const k = 20
 const alpha = 3
 
 type Kademlia struct {
-	rt *RoutingTable
+	rt      *RoutingTable
 	network Net
 }
 
@@ -24,10 +24,10 @@ type potentials struct {
 	wg *sync.WaitGroup
 }
 
-func NewKademlia(address string, network Net, base *Contact) *Kademlia{
-	var c Contact = NewContact(NewKademliaID(randomHex(40)), "localghost")
+func NewKademlia(address string, network Net, base *Contact) *Kademlia {
+	var c Contact = NewContact(NewRandomKademliaID(), "localghost")
 	var rt *RoutingTable = NewRoutingTable(c)
-	if(base != nil){
+	if base != nil {
 		rt.AddContact(*base)
 	}
 	return &Kademlia{rt, network}
@@ -122,14 +122,19 @@ func (kademlia *Kademlia) LookupContact(target *Contact) *CloseContacts{
 
 func (kademlia *Kademlia) LookupData(hash string) {
 	// Step 1.Look for data in own hashtable. If found, return
-	// Step 2. If not, Similar to lookupContact, Send lookupData request to k closest, running alpha number of lookups in parallel 
+	// Step 2. If not, Similar to lookupContact, Send lookupData request to k closest, running alpha number of lookups in parallel
 	// (Step 2 makes sense if we call LookupData through console, but not if someone call it on us... Same for LookupData)
 	// Step 3.If file found, return it
 }
 
 func (kademlia *Kademlia) Store(data []byte) {
-	// Hash data to get handle
+	/*
+		// Hash data to get handle
+		hasher := sha1.New()
+		hasher.Write(data)
+	*/
 	// Store data in own file (I think?)
+
 	// Do lookup on data handle (I think?)
 	// Store data in k closest nodes (I think?)
 	// return handle

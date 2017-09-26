@@ -260,12 +260,12 @@ func TestRoutingTable(t *testing.T) {
 	}
 	
 	//	fmt.Println(rt.root)
-	var a CloseContacts = rt.FindClosestContacts(NewKademliaID(testList[0]), 5)
-	fmt.Println(testList[0])
+	//var a CloseContacts = rt.FindClosestContacts(NewKademliaID(testList[0]), 5)
+	/*fmt.Println(testList[0])
 	for i := 0; i < len(a); i++ {
 		fmt.Println(a[i].contact.ID)
 	}
-	fmt.Println(len(a))
+	fmt.Println(len(a))*/
 	var v int = rt.root.(*Branch).verifyFullTree(1)
 	if(v != levels+1){
 		if (v != -1){fmt.Printf("Expected height %v, got %v\n", levels+1, v)}

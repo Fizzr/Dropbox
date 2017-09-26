@@ -63,6 +63,5 @@ func TestLookupContact(t *testing.T) {
 	var cc CloseContacts = *kad.LookupContact(&look)
 	for i := 0; i < len(cc); i++ {
 		fmt.Println(cc[i].contact.ID)
-	}
-	
+	}	
 }

@@ -27,14 +27,12 @@ func threads(numNodes int) {
 		newRT.AddContact(nContact)
 		port++
 	}
-	fmt.Println(newRT)
-
+	//fmt.Println(newRT)
 }
 
 func main() {
 	threads(2)
-
 	//c := kademlia.NewContact(kademlia.NewRandomKademliaID(), "localhost:8001")
-	kademlia.SendPingMessage()
-	kademlia.SendPingMessage1()
+	//kademlia.SendPingMessage()
+	//kademlia.SendPingMessage1()
 }
