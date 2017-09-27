@@ -5,7 +5,7 @@ import (
 	"sync"
 	//	"sync/atomic"
 	"sort"
-	//	"fmt"
+	"fmt"
 )
 
 const k = 20
@@ -28,12 +28,19 @@ type asyncStruct struct {
 
 func NewKademlia(address string, network Net, base *Contact) *Kademlia{
 	var c Contact = NewContact(NewRandomKademliaID(), address)
+	//fmt.Printf("%T", network)
+	if(fmt.Sprintf("%T", network) == "*d7024e.MockNetwork") {
+		network.(*MockNetwork).me = &c
+	}
 	var rt *RoutingTable = NewRoutingTable(c)
+	var k *Kademlia = &Kademlia{rt, network}
 	if base != nil {
-		rt.AddContact(*base)
+//		fmt.Println("a")
+		k.rt.AddContact(*base)
+		k.FindNode(&c)
 	}
 	
-	return &Kademlia{rt, network}
+	return k
 }
 
 func NewAsyncStruct(base CloseContacts) *asyncStruct{
@@ -206,6 +213,7 @@ func (kademlia *Kademlia) asyncFindNode(target *Contact, as *asyncStruct) {
 }
 
 func (kademlia *Kademlia) FindNode(target *Contact) CloseContacts {
+	//fmt.Println("FIND THAT MOTHAFUCKA!")
 	var cc CloseContacts = kademlia.rt.FindClosestContacts(target.ID, alpha)
 	var as *asyncStruct = NewAsyncStruct(cc)
 	as.wg.Add(alpha)
@@ -222,6 +230,7 @@ func (kademlia *Kademlia) FindNode(target *Contact) CloseContacts {
 			i--
 		}
 	}
+	//fmt.Println(len(result))
 	return result
 }
 
