@@ -26,11 +26,12 @@ type asyncStruct struct {
 }
 
 func NewKademlia(address string, network Net, base *Contact) *Kademlia{
-	var c Contact = NewContact(NewRandomKademliaID(), "localghost")
+	var c Contact = NewContact(NewRandomKademliaID(), address)
 	var rt *RoutingTable = NewRoutingTable(c)
 	if base != nil {
 		rt.AddContact(*base)
 	}
+	
 	return &Kademlia{rt, network}
 }
 

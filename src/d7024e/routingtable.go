@@ -10,6 +10,11 @@ import (
 var myID *KademliaID
 var myBucketID int
 
+type RoutingTable struct {
+	me Contact
+	root Node
+}
+
 type Node interface {
 	getBucketFor(KademliaID) *bucket
 	addContact(Contact) (bool, bool)
@@ -201,29 +206,28 @@ func (leaf *Leaf) getClosestContacts(target *KademliaID, count int) CloseContact
 	return res
 }
 
-type RoutingTable struct {
-	me Contact
-	root Node
-	buckets [IDBits]*bucket
-}
 
 func NewRoutingTable(me Contact) *RoutingTable {
 	routingTable := &RoutingTable{}
-	for i := 0; i < IDBits; i++ {
-		routingTable.buckets[i] = newBucket()
-	}
 	routingTable.me = me
-	myBucketID = 0
+	myBucketID = 1
 	myID = me.ID
 	var prefix [20]byte
-	routingTable.root = &Leaf{prefix,IDBits-1, 0, newBucket(), sync.RWMutex{}}
+	var bit int = int(myID.bitAt(IDBits-1))
+	var left, right *Leaf 
+	var leftPrefix [20]byte = prefix
+	leftPrefix[0] = leftPrefix[0] | 1<<7
+	left = &Leaf{leftPrefix, IDBits-2, bit, newBucket(), sync.RWMutex{}}
+	right = &Leaf{prefix, IDBits-2, (bit-1)*-1, newBucket(), sync.RWMutex{}}
+	routingTable.root = &Branch{prefix, IDBits-1, left, right}
 	routingTable.root.addContact(me)
 	return routingTable
 }
 
 func (routingTable *RoutingTable) AddContact(contact Contact) (bool, bool) {
 	//TODO: Not threadsafe. Maybe just make root into a branch to start off with....
-	var ok, added bool = routingTable.root.addContact(contact)
+	return routingTable.root.addContact(contact)
+	/*var ok, added bool = routingTable.root.addContact(contact)
 	if(!ok){
 		var buckets [2]bucket
 		var splitExponent int = IDBits-1
@@ -240,7 +244,7 @@ func (routingTable *RoutingTable) AddContact(contact Contact) (bool, bool) {
 		var newBranch Branch = Branch{routingTable.root.(*Leaf).prefix, splitExponent, &left, &right}
 		routingTable.root = &newBranch
 		return routingTable.root.addContact(contact)
-	}else {return ok, added}
+	}else {return ok, added}*/
 	
 }
 
