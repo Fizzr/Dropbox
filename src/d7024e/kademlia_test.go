@@ -1,19 +1,20 @@
 package d7024e
 
 import (
-//	"messages"
-//	"net"
+	//	"messages"
+	//	"net"
 	"fmt"
-//	proto "github.com/golang/protobuf/proto"
-	"testing"
+	//	proto "github.com/golang/protobuf/proto"
 	"sort"
+	"testing"
 	"time"
 )
 
 type MockNetwork struct {
-	ip string
+	ip   string
 	port int
 }
+
 var lookList []string = []string{
 	"0000000000000000000000000000000000000000",
 	"1111111111111111111111111111111111111111",
@@ -31,13 +32,13 @@ var lookList []string = []string{
 	"DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD",
 	"EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE",
 	"FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"}
-	
+
 var randRTs []RoutingTable
 
-func (mn *MockNetwork) SendPingMessage(contact *Contact){
+func (mn *MockNetwork) SendPingMessage(contact *Contact) {
 	return
 }
-func (mn *MockNetwork) SendFindContactMessage(contact *Contact, target *KademliaID) CloseContacts{
+func (mn *MockNetwork) SendFindContactMessage(contact *Contact, target *KademliaID) CloseContacts {
 	time.Sleep(10000)
 	/*for i := 0; i < len(lookList); i++ {
 		if contact.ID.String() == lookList[i] {
@@ -50,8 +51,8 @@ func (mn *MockNetwork) SendFindContactMessage(contact *Contact, target *Kademlia
 			return res
 		}
 	}*/
-	for i:=0; i < len(randRTs); i++ {
-		if(randRTs[i].me.ID.Equals(contact.ID)){
+	for i := 0; i < len(randRTs); i++ {
+		if randRTs[i].me.ID.Equals(contact.ID) {
 			return randRTs[i].FindClosestContacts(target, k)
 		}
 	}
@@ -64,7 +65,7 @@ func (mn *MockNetwork) SendStoreMessage(data []byte) {
 	return
 }
 
-func getClosest(target KademliaID, conts []*Contact) CloseContacts{
+func getClosest(target KademliaID, conts []*Contact) CloseContacts {
 	var cc CloseContacts
 	for i := 0; i < len(conts); i++ {
 		var dist *KademliaID = conts[i].CalcDistance(&target)
@@ -74,17 +75,17 @@ func getClosest(target KademliaID, conts []*Contact) CloseContacts{
 	return cc
 }
 
-var fib []int = []int{1,2,3,5,7,12,19,31}
+var fib []int = []int{1, 2, 3, 5, 7, 12, 19, 31}
 
 func TestKademlia(t *testing.T) {
 	var q, port int = 100, 8001
 	var contacts []*Contact = make([]*Contact, 0, q)
-	for i:= 0; i < q; i++ {
+	for i := 0; i < q; i++ {
 		c := NewContact(NewRandomKademliaID(), fmt.Sprintf("localhost:%d", port))
 		contacts = append(contacts, &c)
 		randRTs = append(randRTs, *NewRoutingTable(*contacts[i]))
 	}
-	for i:= 0; i < q; i++ {
+	for i := 0; i < q; i++ {
 		var cc CloseContacts = getClosest(*contacts[i].ID, contacts)
 		for j := 0; j < len(fib); j++ {
 			//fmt.Print(",")
@@ -117,5 +118,5 @@ func testFindNode(t *testing.T) {
 		fmt.Println(cc[i].contact.ID)
 	}
 	//fmt.Println(kad.rt.root)
-	
+
 }
