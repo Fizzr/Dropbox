@@ -25,6 +25,14 @@ type asyncStruct struct {
 	run bool
 }
 
+func NewKademlia(address string, network Net, base *Contact) *Kademlia{
+	var c Contact = NewContact(NewRandomKademliaID(), "localghost")
+	var rt *RoutingTable = NewRoutingTable(c)
+	if base != nil {
+		rt.AddContact(*base)
+	}
+	return &Kademlia{rt, network}
+}
 
 func NewAsyncStruct(base CloseContacts) *asyncStruct{
 	var wg sync.WaitGroup
@@ -126,14 +134,6 @@ func (as *asyncStruct) addResult(res CloseContacts) {
 	as.cond.L.Unlock()
 }
 
-func NewKademlia(address string, network Net, base *Contact) *Kademlia{
-	var c Contact = NewContact(NewRandomKademliaID(), "localghost")
-	var rt *RoutingTable = NewRoutingTable(c)
-	if base != nil {
-		rt.AddContact(*base)
-	}
-	return &Kademlia{rt, network}
-}
 
 func (kademlia *Kademlia) asyncLookup(target *Contact, as *asyncStruct, result *Contact, num int) {
 	defer as.wg.Done()
@@ -192,7 +192,9 @@ func (kademlia *Kademlia) asyncFindNode(target *Contact, as *asyncStruct) {
 		var c *CloseContact = as.getNext()
 		if (c == nil) {return}
 		var a CloseContacts = kademlia.network.SendFindContactMessage(&c.contact, target.ID)
-		
+		for i:=0; i < len(a); i++ {
+			go kademlia.rt.AddContact(a[i].contact)
+		}
 		as.addResult(a)
 	}
 }

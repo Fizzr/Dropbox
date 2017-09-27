@@ -78,5 +78,6 @@ func TestFindNode(t *testing.T) {
 	for i := 0; i < len(cc); i++ {
 		fmt.Println(cc[i].contact.ID)
 	}
+	fmt.Println(kad.rt.root)
 	
 }

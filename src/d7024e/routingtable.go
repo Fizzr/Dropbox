@@ -4,6 +4,7 @@ import (
 	//"math"
 	"fmt"
 	"sort"
+	"sync"
 )
 
 var myID *KademliaID
@@ -26,6 +27,7 @@ type Leaf struct{
 	exponent int
 	ID int
 	buck *bucket
+	rw sync.RWMutex
 }
 
 
@@ -34,7 +36,7 @@ type Leaf struct{
 func (branch *Branch) isOne(ID KademliaID) bool{
 	return ID.bitAt(branch.exponent) == 1
 }
-
+//Is this needed ever?!
 func (branch *Branch) getBucketFor(ID KademliaID) *bucket{
 	if(branch.isOne(ID)){
 		return branch.left.getBucketFor(ID)
@@ -48,27 +50,37 @@ func (branch *Branch) addContact(contact Contact) (bool, bool) {
 	var ok, added, isLeft bool
 	//fmt.Println(contact.ID.bitAt(branch.exponent))
 	isLeft = contact.ID.bitAt(branch.exponent) == 1
+	var node Node
 	if(isLeft){
-		ok, added = branch.left.addContact(contact)
+		node = branch.left
+		//ok, added = branch.left.addContact(contact)
 	} else {
-		ok, added = branch.right.addContact(contact)
+		node = branch.right
+		//ok, added = branch.right.addContact(contact)
 	}
 	
+	if(fmt.Sprintf("%T", node) == "*d7024e.Leaf"){
+		node.(*Leaf).rw.Lock()	//Lock for writing
+		defer node.(*Leaf).rw.Unlock()
+	}
+	ok, added = node.addContact(contact)
 	if(ok){
 		return ok, added
 	} else { 
-		//fmt.Print("Splitting Leaf ")
-		var leaf *Leaf
-		if(isLeft){
+		// Need to split leaf
+		// Only ever get here if just above a leaf.
+	
+	//fmt.Print("Splitting Leaf ")
+		var leaf *Leaf = node.(*Leaf)
+/*		if(isLeft){
 			leaf = branch.left.(*Leaf)
 		} else {
 			leaf = branch.right.(*Leaf)
-		}
+		}*/
 		if(leaf.ID != myBucketID){
-			fmt.Println("HAHAHAH")
+			//fmt.Println("HAHAHAH")
 			return true, false;	// We don't wanna split. Return true, cos everything is just fine!
 		}
-		
 		var splitExponent int = leaf.exponent
 		var buckets [2]bucket = leaf.buck.splitOn(splitExponent)
 		var oldID int = leaf.ID
@@ -81,8 +93,8 @@ func (branch *Branch) addContact(contact Contact) (bool, bool) {
 		var leftPrefix, rightPrefix [20]byte = prefix, prefix
 		var IDindex int = (IDLength - 1) - (splitExponent/8)
 		leftPrefix[IDindex] = leftPrefix[IDindex] | (1 << uint(splitExponent%8))
-		var left Leaf = Leaf{leftPrefix, splitExponent-1, leftID, &(buckets[1])}
-		var right Leaf = Leaf{rightPrefix, splitExponent-1, rightID, &(buckets[0])}
+		var left Leaf = Leaf{leftPrefix, splitExponent-1, leftID, &(buckets[1]), sync.RWMutex{}}
+		var right Leaf = Leaf{rightPrefix, splitExponent-1, rightID, &(buckets[0]), sync.RWMutex{}}
 
 		myBucketID = oldID +1
 		var newBranch Branch = Branch{prefix, splitExponent, &left, &right}
@@ -106,11 +118,19 @@ func (branch *Branch) getClosestContacts(target *KademliaID, count int) CloseCon
 		direction = branch.right
 		other = branch.left
 	}
+	if(fmt.Sprintf("%T", direction) == "*d7024e.Leaf") {
+		direction.(*Leaf).rw.RLock();	//read Lock
+		defer direction.(*Leaf).rw.RUnlock();
+	}
 	var dirRes CloseContacts = direction.getClosestContacts(target, count)
 	var diff int = count - len(dirRes)
 	if(diff == 0){
 		return dirRes
 	}else{
+		if(fmt.Sprintf("%T", other) == "*d7024e.Leaf") {
+			other.(*Leaf).rw.RLock();	//read Lock
+			defer other.(*Leaf).rw.RUnlock();
+		}
 		return append(dirRes, other.getClosestContacts(target, diff)...)
 	}
 }
@@ -196,13 +216,13 @@ func NewRoutingTable(me Contact) *RoutingTable {
 	myBucketID = 0
 	myID = me.ID
 	var prefix [20]byte
-	routingTable.root = &Leaf{prefix,IDBits-1, 0, newBucket()}
+	routingTable.root = &Leaf{prefix,IDBits-1, 0, newBucket(), sync.RWMutex{}}
 	routingTable.root.addContact(me)
 	return routingTable
 }
 
 func (routingTable *RoutingTable) AddContact(contact Contact) (bool, bool) {
-	
+	//TODO: Not threadsafe. Maybe just make root into a branch to start off with....
 	var ok, added bool = routingTable.root.addContact(contact)
 	if(!ok){
 		var buckets [2]bucket
@@ -214,8 +234,8 @@ func (routingTable *RoutingTable) AddContact(contact Contact) (bool, bool) {
 		var rightID int = (int(myBitAtExponent)-1) * -1		//if 1, becomes 0. If 0, becomes 1
 		var leftPrefix, rightPrefix [20]byte
 		leftPrefix[0] = 1 << uint(splitExponent%8)
-		left = Leaf{leftPrefix, splitExponent-1, leftID, &(buckets[1])}
-		right = Leaf{rightPrefix, splitExponent-1, rightID, &(buckets[0])}
+		left = Leaf{leftPrefix, splitExponent-1, leftID, &(buckets[1]), sync.RWMutex{}}
+		right = Leaf{rightPrefix, splitExponent-1, rightID, &(buckets[0]), sync.RWMutex{}}
 		myBucketID = 1
 		var newBranch Branch = Branch{routingTable.root.(*Leaf).prefix, splitExponent, &left, &right}
 		routingTable.root = &newBranch
@@ -226,17 +246,4 @@ func (routingTable *RoutingTable) AddContact(contact Contact) (bool, bool) {
 
 func (routingTable *RoutingTable) FindClosestContacts(target *KademliaID, count int) CloseContacts {
 	return routingTable.root.getClosestContacts(target, count)
-}
-
-func (routingTable *RoutingTable) getBucketIndex(id *KademliaID) int {
-	distance := id.CalcDistance(routingTable.me.ID)
-	for i := 0; i < IDLength; i++ {
-		for j := 0; j < 8; j++ {
-			if (distance[i]>>uint8(7-j))&0x1 != 0 {
-				return i*8 + j
-			}
-		}
-	}
-
-	return IDBits - 1
 }
