@@ -1,10 +1,11 @@
 package d7024e
 
 import (
+	"crypto/sha1"
 	"sync"
-//	"sync/atomic"
+	//	"sync/atomic"
 	"sort"
-//	"fmt"
+	//	"fmt"
 )
 
 const k = 20
@@ -16,17 +17,16 @@ type Kademlia struct {
 }
 
 type asyncStruct struct {
-	cc CloseContacts
-	searched CloseContacts
-	cond *sync.Cond
-	index int
+	cc            CloseContacts
+	searched      CloseContacts
+	cond          *sync.Cond
+	index         int
 	activeThreads int
-	wg *sync.WaitGroup
-	run bool
+	wg            *sync.WaitGroup
+	run           bool
 }
 
-
-func NewAsyncStruct(base CloseContacts) *asyncStruct{
+func NewAsyncStruct(base CloseContacts) *asyncStruct {
 	var wg sync.WaitGroup
 	return &asyncStruct{base, nil, &sync.Cond{L: &sync.Mutex{}}, 0, 0, &wg, true}
 }
@@ -37,35 +37,35 @@ func (as *asyncStruct) getNext() *CloseContact {
 	var checked bool = false
 	for !checked {
 		for len(as.cc) == 0 {
-			if as.activeThreads == 0 {		//No hope of getting new items.
+			if as.activeThreads == 0 { //No hope of getting new items.
 				as.cond.L.Unlock()
-				return nil					//No new item we haven't already checked. 
+				return nil //No new item we haven't already checked.
 			}
-			as.cond.Wait()		//Wait until other threads return with new information
+			as.cond.Wait() //Wait until other threads return with new information
 		}
 		c = as.cc[0]
 		as.cc = as.cc[1:]
 		checked = true
-		for i:= 0; checked && i < len(as.searched); i++ {					//Make sure we're not seaching one we already searched.
+		for i := 0; checked && i < len(as.searched); i++ { //Make sure we're not seaching one we already searched.
 			if c.contact.ID.Equals(as.searched[i].contact.ID) {
 				checked = false
 			}
 		}
-					//Checked through all searched items, didn't find duplicates
+		//Checked through all searched items, didn't find duplicates
 	}
 	as.searched = append(as.searched, c)
-//	fmt.Println("Searched ------ " + fmt.Sprint(as.searched))
+	//	fmt.Println("Searched ------ " + fmt.Sprint(as.searched))
 	var num int = as.index
-	as.index ++
-	if(num >= k) {
+	as.index++
+	if num >= k {
 		as.run = false
 		as.cond.Broadcast()
 		as.cond.L.Unlock()
-		return nil			//Already ran k times
+		return nil //Already ran k times
 	}
-	
+
 	as.searched = append(as.searched, c)
-	as.activeThreads ++
+	as.activeThreads++
 	as.cond.L.Unlock()
 	return &c
 }
@@ -77,15 +77,15 @@ func (as *asyncStruct) addResult(res CloseContacts) {
 	//Insert elements from res into index of cc if res is less than cc element
 	//If they are the same, discard res element
 	/*for i:= 0; i < len(as.cc); i++ {
-		fmt.Printf("Input cc - %v\n", as.cc[i]) 
+		fmt.Printf("Input cc - %v\n", as.cc[i])
 	}
 	for i:= 0; i < len(res); i++ {
-		fmt.Printf("Input res - %v\n", res[i]) 
+		fmt.Printf("Input res - %v\n", res[i])
 	}*/
 
-	var newCC CloseContacts = make([]CloseContact, 0, len(res) + len(as.cc))
+	var newCC CloseContacts = make([]CloseContact, 0, len(res)+len(as.cc))
 	//fmt.Printf("resLen %d ccLen %d newCCLen %d\n",len(res), len(as.cc), len(newCC))
-	for i, j, k := 0,0,0; j+i < len(as.cc) + len(res); {
+	for i, j, k := 0, 0, 0; j+i < len(as.cc)+len(res); {
 		//fmt.Printf("i %d j %d k %d\n",i,j,k)
 		if j == len(res) {
 			newCC = append(newCC, as.cc[i])
@@ -101,13 +101,13 @@ func (as *asyncStruct) addResult(res CloseContacts) {
 		}
 		if as.cc[i].contact.ID.Equals(res[j].contact.ID) {
 			j++
-			continue	//Skip this result element
+			continue //Skip this result element
 		}
 		if as.cc[i].distance.Less(res[j].distance) {
 			newCC = append(newCC, as.cc[i])
 			k++
 			i++
-			continue 		//go to next element
+			continue //go to next element
 		} else {
 			newCC = append(newCC, res[j])
 			k++
@@ -118,57 +118,70 @@ func (as *asyncStruct) addResult(res CloseContacts) {
 	/*for i := 0; i < len(newCC); i++ {
 		fmt.Println(newCC[i])
 	}*/
-//	as.cc = (append(as.cc, res...))
-//	sort.Sort(as.cc)
+	//	as.cc = (append(as.cc, res...))
+	//	sort.Sort(as.cc)
 	as.cc = newCC
-	as.activeThreads --
+	as.activeThreads--
 	as.cond.Broadcast()
 	as.cond.L.Unlock()
 }
 
-func NewKademlia(address string, network Net, base *Contact) *Kademlia{
+func NewKademlia(address string, network Net, base *Contact) *Kademlia {
 	var c Contact = NewContact(NewRandomKademliaID(), "localghost")
 	var rt *RoutingTable = NewRoutingTable(c)
 	if base != nil {
 		rt.AddContact(*base)
 	}
-	return &Kademlia{rt, network}
+
+	var k *Kademlia = &Kademlia{rt, network}
+	k.FindNode(&c)
+	/* BootStrap
+	// 1.  New Node is created with NodeID and an IP address
+	// 2.  NN sends Lookup Request to Bootstrap Node. Returns K-Closest Nodes it knows to NN.
+	// 3. BN will add NN to its routing table, so NN is now in Network
+	// 4. NN has list of K-Closest Nodes to itself. NN adds BN to its routing table.
+	// 5. NN pings all Nodes in K-Closest List. Adds those that Answer to its routing table and those nodes add it to their RT.
+	// 6. NN is now Connected.
+	*/
+	return k
 }
 
 func (kademlia *Kademlia) asyncLookup(target *Contact, as *asyncStruct, result *Contact, num int) {
 	defer as.wg.Done()
-	for as.run{
-	var c *CloseContact = as.getNext()
-		if (c == nil) {return}
-		
+	for as.run {
+		var c *CloseContact = as.getNext()
+		if c == nil {
+			return
+		}
+
 		//fmt.Printf("Thread %v - Searching %s\n", num, c)
-		
+
 		var a CloseContacts = kademlia.network.SendFindContactMessage(&c.contact, target.ID)
 		//Go through all the results, and spawn routines to add them to RT. Also check for target
 		//fmt.Printf("Thread %v - len %v\n", num, len(a))
 		for i := 0; i < len(a); i++ {
 			//fmt.Printf("Thread %v - result %s\n",num, a[i])
 			go kademlia.rt.AddContact(a[i].contact)
-			if(a[i].contact.ID.Equals(target.ID)){
-				*result =  a[i].contact
+			if a[i].contact.ID.Equals(target.ID) {
+				*result = a[i].contact
 				//fmt.Printf("AAAAAAAAAAA %v\n", a[i].contact)
 				as.run = false
 			}
 		}
-	
+
 		as.addResult(a)
-		for i := 0; i < len(as.cc); i++{
+		for i := 0; i < len(as.cc); i++ {
 			//fmt.Printf("Thread %v - cc %v\n", num, as.cc[i])
 		}
 	}
 }
 
-func (kademlia *Kademlia) LookupContact(target *Contact) *Contact{
+func (kademlia *Kademlia) LookupContact(target *Contact) *Contact {
 	// Step 1. Get alpha closest to target
 	var cc CloseContacts = kademlia.rt.FindClosestContacts(target.ID, alpha)
 	// Step 2. See if target exists. If so, return it
 	for i := 0; i < len(cc); i++ {
-		if(cc[i].contact.ID == target.ID){
+		if cc[i].contact.ID == target.ID {
 			return &(cc[i].contact)
 		}
 	}
@@ -177,12 +190,12 @@ func (kademlia *Kademlia) LookupContact(target *Contact) *Contact{
 	//alpha = 1
 	as.wg.Add(alpha)
 	var result *Contact = &Contact{}
-	for i:= 0; i < alpha; i++ {
+	for i := 0; i < alpha; i++ {
 		go kademlia.asyncLookup(target, as, result, i)
 	}
 	//wait for result here
 	as.wg.Wait()
-	
+
 	return result
 }
 
@@ -190,26 +203,28 @@ func (kademlia *Kademlia) asyncFindNode(target *Contact, as *asyncStruct) {
 	defer as.wg.Done()
 	for as.run {
 		var c *CloseContact = as.getNext()
-		if (c == nil) {return}
+		if c == nil {
+			return
+		}
 		var a CloseContacts = kademlia.network.SendFindContactMessage(&c.contact, target.ID)
-		
+
 		as.addResult(a)
 	}
 }
 
-func (kademlia *Kademlia) FindNode(target *Contact) CloseContacts{
+func (kademlia *Kademlia) FindNode(target *Contact) CloseContacts {
 	var cc CloseContacts = kademlia.rt.FindClosestContacts(target.ID, alpha)
 	var as *asyncStruct = NewAsyncStruct(cc)
 	as.wg.Add(alpha)
-	for i:= 0; i < alpha; i++ {
+	for i := 0; i < alpha; i++ {
 		go kademlia.asyncFindNode(target, as)
 	}
 	as.wg.Wait()
-	
+
 	var result CloseContacts = append(as.cc, as.searched...)
 	sort.Sort(result)
-	for i:= 0; i < len(result)-1; i ++ {
-		if(result[i].contact.ID.Equals(result[i+1].contact.ID)) {
+	for i := 0; i < len(result)-1; i++ {
+		if result[i].contact.ID.Equals(result[i+1].contact.ID) {
 			result = append(result[:i], result[i+1:]...)
 			i--
 		}
@@ -225,11 +240,11 @@ func (kademlia *Kademlia) LookupData(hash string) {
 }
 
 func (kademlia *Kademlia) Store(data []byte) {
-	/*
-		// Hash data to get handle
-		hasher := sha1.New()
-		hasher.Write(data)
-	*/
+
+	// Hash data to get handle
+	hasher := sha1.New()
+	hasher.Write(data)
+
 	// Store data in own file (I think?)
 
 	// Do lookup on data handle (I think?)

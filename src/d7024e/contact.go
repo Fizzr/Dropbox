@@ -5,12 +5,12 @@ import (
 )
 
 type Contact struct {
-	ID       *KademliaID
-	Address  string
+	ID      *KademliaID
+	Address string
 }
 
-type CloseContact struct{
-	contact Contact
+type CloseContact struct {
+	contact  Contact
 	distance *KademliaID
 }
 
@@ -20,7 +20,7 @@ func NewContact(id *KademliaID, address string) Contact {
 	return Contact{id, address}
 }
 
-func (contact *Contact) CalcDistance(target *KademliaID) *KademliaID{
+func (contact *Contact) CalcDistance(target *KademliaID) *KademliaID {
 	return contact.ID.CalcDistance(target)
 }
 
