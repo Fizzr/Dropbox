@@ -102,8 +102,8 @@ func TestProtobufNetwork(t *testing.T) {
 	conn.Close()
 }
 
-//Without Protobuf Implementation
+/*/Without Protobuf Implementation
 func TestListenPing(t *testing.T) {
 	Listen("localhost", 8001)
 	SendPingMessage("localhost", 8001)
-}
+}*/
