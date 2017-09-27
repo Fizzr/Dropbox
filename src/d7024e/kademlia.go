@@ -26,7 +26,17 @@ type asyncStruct struct {
 	run           bool
 }
 
-func NewAsyncStruct(base CloseContacts) *asyncStruct {
+func NewKademlia(address string, network Net, base *Contact) *Kademlia{
+	var c Contact = NewContact(NewRandomKademliaID(), address)
+	var rt *RoutingTable = NewRoutingTable(c)
+	if base != nil {
+		rt.AddContact(*base)
+	}
+	
+	return &Kademlia{rt, network}
+}
+
+func NewAsyncStruct(base CloseContacts) *asyncStruct{
 	var wg sync.WaitGroup
 	return &asyncStruct{base, nil, &sync.Cond{L: &sync.Mutex{}}, 0, 0, &wg, true}
 }
@@ -126,25 +136,6 @@ func (as *asyncStruct) addResult(res CloseContacts) {
 	as.cond.L.Unlock()
 }
 
-func NewKademlia(address string, network Net, base *Contact) *Kademlia {
-	var c Contact = NewContact(NewRandomKademliaID(), "localghost")
-	var rt *RoutingTable = NewRoutingTable(c)
-	if base != nil {
-		rt.AddContact(*base)
-	}
-
-	var k *Kademlia = &Kademlia{rt, network}
-	k.FindNode(&c)
-	/* BootStrap
-	// 1.  New Node is created with NodeID and an IP address
-	// 2.  NN sends Lookup Request to Bootstrap Node. Returns K-Closest Nodes it knows to NN.
-	// 3. BN will add NN to its routing table, so NN is now in Network
-	// 4. NN has list of K-Closest Nodes to itself. NN adds BN to its routing table.
-	// 5. NN pings all Nodes in K-Closest List. Adds those that Answer to its routing table and those nodes add it to their RT.
-	// 6. NN is now Connected.
-	*/
-	return k
-}
 
 func (kademlia *Kademlia) asyncLookup(target *Contact, as *asyncStruct, result *Contact, num int) {
 	defer as.wg.Done()
@@ -207,7 +198,9 @@ func (kademlia *Kademlia) asyncFindNode(target *Contact, as *asyncStruct) {
 			return
 		}
 		var a CloseContacts = kademlia.network.SendFindContactMessage(&c.contact, target.ID)
-
+		for i:=0; i < len(a); i++ {
+			go kademlia.rt.AddContact(a[i].contact)
+		}
 		as.addResult(a)
 	}
 }
