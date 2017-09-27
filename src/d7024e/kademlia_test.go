@@ -7,6 +7,7 @@ import (
 //	proto "github.com/golang/protobuf/proto"
 	"testing"
 	"sort"
+	"time"
 )
 
 type MockNetwork struct {
@@ -35,6 +36,7 @@ func (mn *MockNetwork) SendPingMessage(contact *Contact){
 	return
 }
 func (mn *MockNetwork) SendFindContactMessage(contact *Contact, target *KademliaID) CloseContacts{
+	time.Sleep(10000)
 	for i := 0; i < len(lookList); i++ {
 		if contact.ID.String() == lookList[i] {
 			var res CloseContacts
@@ -60,8 +62,21 @@ func TestLookupContact(t *testing.T) {
 	var base Contact = NewContact(NewKademliaID(lookList[0]), "localhost:8001")
 	var kad *Kademlia = NewKademlia("localhost:8001", mn, &base)
 	var look Contact = NewContact(NewKademliaID(lookList[15]), "")
-	var cc CloseContacts = *kad.LookupContact(&look)
+	var ret *Contact = kad.LookupContact(&look)
+	/*for i := 0; i < len(cc); i++ {
+		fmt.Println(cc[i].contact.ID)
+	}*/
+	fmt.Println(ret)
+}
+
+func TestFindNode(t *testing.T) {
+	var mn *MockNetwork = &MockNetwork{"localhost", 8001}
+	var base Contact = NewContact(NewKademliaID(lookList[0]), "localhost:8001")
+	var kad *Kademlia = NewKademlia("localhost:8001", mn, &base)
+	var look Contact = NewContact(NewKademliaID(lookList[15]), "")
+	var cc CloseContacts = kad.FindNode(&look)
 	for i := 0; i < len(cc); i++ {
 		fmt.Println(cc[i].contact.ID)
-	}	
+	}
+	
 }

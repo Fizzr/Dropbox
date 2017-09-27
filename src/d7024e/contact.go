@@ -37,3 +37,6 @@ func (c CloseContacts) Swap(i, j int) {
 func (c CloseContacts) Less(i, j int) bool {
 	return c[i].distance.Less(c[j].distance)
 }
+func (c CloseContact) String() string {
+	return fmt.Sprintf("%s - Distance %s", c.contact, c.distance)
+}
