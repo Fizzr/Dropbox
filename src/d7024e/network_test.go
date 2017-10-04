@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"messages"
 	"net"
+	"time"
 	"testing"
 
 	proto "github.com/golang/protobuf/proto"
@@ -59,11 +60,13 @@ func TestProtobufNetwork(t *testing.T) {
 	var addr *net.UDPAddr
 	addr, err := net.ResolveUDPAddr("udp", "localhost:8001")
 
-	a := messages.Message{}
-	a.SenderID = "1234"
-	a.SenderAddress = "localhost:8002"
+	var a messages.Message = messages.Message{}
+	sender := &messages.Contact{}
+	sender.ID = "12344321"
+	sender.Address = "localhost:8002"
+	a.Sender = sender
 	a.Type = 0
-	aInner := &messages.Request{1, "4321"}
+	aInner := &messages.Request{0,1, "4321"}
 	a.Request = aInner
 
 	p, _ := proto.Marshal(&a)
@@ -102,8 +105,41 @@ func TestProtobufNetwork(t *testing.T) {
 	conn.Close()
 }
 
-/*/Without Protobuf Implementation
-func TestListenPing(t *testing.T) {
-	Listen("localhost", 8001)
-	SendPingMessage("localhost", 8001)
-}*/
+func TestGetResponse(t *testing.T) {
+	net := NewNetwork("localhost","8011")
+	ID := 2
+	a:= func () {
+		time.Sleep(100 * time.Millisecond)
+		tmp := messages.Response{int64(ID), 1, nil}
+		net.responseCond.L.Lock()
+		*net.responseList = append(*net.responseList, tmp)
+		*net.newResponse = true
+		net.responseCond.Broadcast()
+		net.responseCond.L.Unlock()
+	}
+	var bueno bool = true;
+	go a()
+	response := net.getResponse(int64(ID))
+	//fmt.Printf("%T\n",response.Type)
+	//fmt.Println(response)
+	bueno = bueno && response.MessageID == int64(ID)
+	response = net.getResponse(int64(11))
+	bueno = bueno && response.MessageID == 0
+	if(bueno){
+		fmt.Println("Success - Network getResponse")
+	}else {
+		t.Fail()
+	}
+}
+
+func TestComunnications2(t *testing.T) {
+	//fmt.Println("222")
+	net1 := NewNetwork("localhost","8025")
+	net2 := NewNetwork("localhost","8026")
+	c1 := NewContact(NewRandomKademliaID(), "localhost:8025")
+	c2 := NewContact(NewKademliaID("53FAFFFBB0230099001E200000000C0000000000"), "localhost:8026")
+	net1.me = *c1.ID
+	net2.me = *c2.ID
+	time.Sleep(1000000)
+	fmt.Printf("Ping: %v\n", net1.SendPingMessage(&c2))
+}

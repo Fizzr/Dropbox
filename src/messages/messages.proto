@@ -16,11 +16,11 @@ message message {
 		RESPONSE = 1;
 	}
 	Type type = 1;
-	string senderID = 2;
-	string senderAddress = 3;
 	
-	request Request = 4;
-	response Response = 5;	
+	contact sender = 2;
+	
+	request Request = 3;
+	response Response = 4;	
 }
 
 message request 
@@ -33,8 +33,9 @@ message request
 		STORE		= 3;
 		
 	}
-	Type type = 1;
-	string ID = 2;
+	int64 messageID = 1;
+	Type type = 2;
+	string ID = 3;
 }
 
 message response 
@@ -47,26 +48,13 @@ message response
 		FINDDATA_NODES = 3;
 		STORE = 4;
 	}
-	Type type = 1;
-	repeating string IDs = 2
+	int64 messageID = 1;
+	Type type = 2;
+	repeated contact contacts = 3;
 }
 
-message findClosest 
+message contact
 {
-  string find = 1;
-}
-
-message ping 
-{
-
-}
-
-message findData
-{
-	string find = 1;
-}
-
-message store 
-{
-	string store = 1;
+	string ID = 1;
+	string address = 2;
 }
