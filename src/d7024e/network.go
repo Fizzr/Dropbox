@@ -10,10 +10,12 @@ import (
 	"messages"
 )
 
+const timeout = 1 * time.Second
+
 type responses []messages.Response
 
 type Net interface {
-	SendPingMessage(contact *Contact)
+	SendPingMessage(contact *Contact) bool
 	SendFindContactMessage(contact *Contact, target *KademliaID) CloseContacts
 	SendFindDataMessage(hash string)
 	SendStoreMessage(data []byte)
@@ -22,7 +24,8 @@ type Net interface {
 type Network struct {
 	address string
 	port string
-	me KademliaID
+	kad *Kademlia
+//	me KademliaID
 	mID int64
 	IDLock *sync.Mutex
 	responseList *responses
@@ -38,10 +41,10 @@ func (net *Network) timeoutCheck(){
 	}
 }
 
-func NewNetwork (address string, port string) Network {
+func NewNetwork (address string, port string, kad *Kademlia) Network {
 	b := false
 	c := make(responses, 0)
-	a:= Network{address: address, port: port, mID: 1, IDLock: &sync.Mutex{}, responseList: &c, newResponse: &b, responseCond: &sync.Cond{L: &sync.Mutex{}}}
+	a:= Network{address: address, port: port, mID: 1, kad: kad, IDLock: &sync.Mutex{}, responseList: &c, newResponse: &b, responseCond: &sync.Cond{L: &sync.Mutex{}}}
 	go a.timeoutCheck()
 	go a.Listen()
 	return a
@@ -55,18 +58,21 @@ func (net *Network) getMessageID() int64 {
 	return ID
 }
 
-const timeout = 5 * time.Second
 
-func (net *Network) getResponse (ID int64) messages.Response{
+func (net *Network) getResponse (ID int64) *messages.Response{
 	// IMPORTANT! Response might not ever arrive (UDP)! Add some robust timeout options
+	// Also, add timeout for messages in queue, to save memory and prevent unecessary looping
 	var start time.Time = time.Now()
 	for {
+		//fmt.Print("brap")
+		if(time.Since(start) > timeout) {
+			return nil
+		}
 		net.responseCond.L.Lock()
 		defer net.responseCond.L.Unlock()
 		for(!*net.newResponse) {
 			if(time.Since(start) > timeout) {
-				//fmt.Println("i ded")
-				return messages.Response{}
+				return nil
 			}
 			net.responseCond.Wait()
 		}
@@ -77,11 +83,11 @@ func (net *Network) getResponse (ID int64) messages.Response{
 				if len(*net.responseList) == 0 {
 					*net.newResponse = false
 				}
-				return a
+				return &a
 			}
 		}
 	}
-	return messages.Response{}
+	return nil
 }
 
 func CheckError(err error) {
@@ -93,6 +99,7 @@ func CheckError(err error) {
 
 func (network *Network) addResponse (response messages.Response) {
 	network.responseCond.L.Lock()
+	//fmt.Println("Twerk. Adding ID ", response.MessageID)
 	*network.responseList = append(*network.responseList, response)
 	*network.newResponse = true
 	network.responseCond.Broadcast()
@@ -112,8 +119,8 @@ func (network *Network) Listen() {
 
 	for {
 		n, err := ServerConn.Read(buff)
-		/*fmt.Printf("Received %d bytes. Buff len %d \n", n, len(buff))
-		for i:= 0; i < n; i++ {
+		//fmt.Printf("Received %d bytes. Buff len %d \n", n, len(buff))
+		/*for i:= 0; i < n; i++ {
 			fmt.Print(buff[i])
 		}
 		fmt.Println()
@@ -126,13 +133,20 @@ func (network *Network) Listen() {
 		err = proto.Unmarshal(buff[:n], received)
 		CheckError(err)
 		if(received.Type == messages.Message_RESPONSE) {
+			//fmt.Println("Listened response")
 			go network.addResponse(*received.Response)
 		} else if (received.Type == messages.Message_REQUEST) {
-			//TODO: Request code!
-			request := received.Request
-			switch request.Type {
+			//fmt.Println("Listened request")
+			switch received.Request.Type {
 				case messages.Request_PING:
-						network.respondPingMessage(*received)
+					go network.respondPingMessage(*received)
+					break
+				case messages.Request_FINDNODE:
+					go network.respondFindNodeMessage(*received)					
+					break
+				case messages.Request_FINDDATA:
+					break
+				case messages.Request_STORE: 
 					break
 				default:
 					fmt.Println("Error: Unknown request type")
@@ -143,33 +157,30 @@ func (network *Network) Listen() {
 	}
 }
 
-func (network *Network) newRequestMessage() messages.Message{
+func (network *Network) newMessage(typ messages.Message_Type) messages.Message{
 	var msg messages.Message = messages.Message{}
-	msg.Type = messages.Message_REQUEST
-	var me messages.Contact = messages.Contact{fmt.Sprint(network.me), network.address + ":" + network.port}
+	msg.Type = typ
+	var me messages.Contact = messages.Contact{fmt.Sprint(network.kad.rt.me.ID), network.address + ":" + network.port, ""}
 	msg.Sender = &me
 	return msg
 }
 
+func (network *Network) newRespondMessage() messages.Message{
+	return network.newMessage(messages.Message_RESPONSE)
+}
+
+func (network *Network) newRequestMessage() messages.Message{
+	return network.newMessage(messages.Message_REQUEST)
+}
+
 func (network *Network) respondPingMessage(received messages.Message) {
-	//fmt.Println("respondPing")
-	//fmt.Println("messege received ", received)
 	ServerAddr, err := net.ResolveUDPAddr("udp", received.Sender.Address)
 	CheckError(err)
-
-//	LocalAddr, err := net.ResolveUDPAddr("udp", network.address + ":" + network.port)
-	CheckError(err)
-
 	Conn, err := net.DialUDP("udp", nil, ServerAddr)
 	CheckError(err)
-
 	defer Conn.Close()
 
-	var msg messages.Message = messages.Message{}
-	msg.Type = messages.Message_RESPONSE
-	var me messages.Contact = messages.Contact{fmt.Sprint(network.me), network.address + ":" + network.port}
-	//fmt.Println(network.me)
-	msg.Sender = &me
+	var msg messages.Message = network.newRespondMessage()
 
 	var ping messages.Response = messages.Response{received.Request.MessageID, messages.Response_PING, nil}
 	msg.Response = &ping
@@ -185,14 +196,10 @@ func (network *Network) respondPingMessage(received messages.Message) {
 }
 
 func (network *Network) SendPingMessage(contact *Contact) bool{
-	//portconv := strconv.Itoa(port)
-	//fmt.Println("sendPing")
+
 	ServerAddr, err := net.ResolveUDPAddr("udp", contact.Address)
 	CheckError(err)
-
-//	LocalAddr, err := net.ResolveUDPAddr("udp", network.address + ":" + network.port)
-	CheckError(err)
-
+	
 	Conn, err := net.DialUDP("udp", nil, ServerAddr)
 	CheckError(err)
 
@@ -206,10 +213,14 @@ func (network *Network) SendPingMessage(contact *Contact) bool{
 	buff, err = proto.Marshal(&msg)
 	CheckError(err)
 	_, err = Conn.Write(buff)
+	//fmt.Printf("wrote %d bytes\n", n)
 	if err != nil {
 		fmt.Println(msg, err)
 	}
-	var response messages.Response = network.getResponse(mID)
+	var response *messages.Response = network.getResponse(mID)
+	if(response == nil){
+		return false
+	}
 	//fmt.Printf("ID should be %v, is %v, type %v\n", mID, response.MessageID, response.Type)
 	//fmt.Println(response)
 	if(response.MessageID == mID && response.Type == messages.Response_PING) {
@@ -218,9 +229,64 @@ func (network *Network) SendPingMessage(contact *Contact) bool{
 	return false;
 }
 
-func (network *Network) SendFindContactMessage(contact *Contact) {
-	// Query for k contacts closest to contact target
-	// Should run synchronous (I guess)
+func (network *Network) respondFindNodeMessage(received messages.Message) {
+	//fmt.Println("respond Find")
+	var cc CloseContacts = network.kad.rt.FindClosestContacts(NewKademliaID(received.Request.ID), k)
+	var msg messages.Message = network.newRespondMessage()
+	var response messages.Response = messages.Response{}
+	response.Type = messages.Response_FINDNODE
+	for i := 0; i < len(cc); i++ {
+		var cont messages.Contact = messages.Contact{fmt.Sprint(cc[i].contact.ID), cc[i].contact.Address, fmt.Sprint(cc[i].distance)}
+		response.Contacts = append(response.Contacts, &cont)
+	}
+	response.MessageID = received.Request.MessageID
+	msg.Response = &response
+	var buff []byte
+	buff, err := proto.Marshal(&msg)
+	CheckError(err)
+	
+	ServerAddr, err := net.ResolveUDPAddr("udp", received.Sender.Address)
+	CheckError(err)
+	Conn, err := net.DialUDP("udp", nil, ServerAddr)
+	CheckError(err)
+	defer Conn.Close()
+
+	_,err = Conn.Write(buff)
+	CheckError(err)
+}
+
+func (network *Network) SendFindContactMessage(contact *Contact, target *KademliaID) CloseContacts{
+	//fmt.Println("send find")
+	ServerAddr, err := net.ResolveUDPAddr("udp", contact.Address)
+	CheckError(err)
+	
+	Conn, err := net.DialUDP("udp", nil, ServerAddr)
+	CheckError(err)
+	defer Conn.Close()
+
+	var msg messages.Message = network.newRequestMessage()
+	var mID int64 = network.getMessageID()
+	msg.Request = &messages.Request{mID, messages.Request_FINDNODE, fmt.Sprint(target)}
+	
+	var buff []byte
+	buff, err = proto.Marshal(&msg)
+	CheckError(err)
+	_, err = Conn.Write(buff)
+	//fmt.Printf("wrote %d bytes\n", n)
+	if err != nil {
+		fmt.Println(msg, err)
+	}
+	//fmt.Println("sent find. Waiting for ID ", mID)
+	var response *messages.Response = network.getResponse(mID)
+	//fmt.Println("response ", response)
+	if(response == nil){
+		return nil
+	}
+	var res CloseContacts
+	for i := 0; i < len(response.Contacts); i ++ {
+		res = append(res, CloseContact{Contact{NewKademliaID(response.Contacts[i].ID), response.Contacts[i].Address}, NewKademliaID(response.Contacts[i].Distance)})
+	}
+	return res
 }
 
 func (network *Network) SendFindDataMessage(hash string) {

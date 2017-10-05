@@ -35,8 +35,8 @@ var lookList []string = []string{
 	
 var randRTs []RoutingTable
 
-func (mn *MockNetwork) SendPingMessage(contact *Contact){
-	return
+func (mn *MockNetwork) SendPingMessage(contact *Contact) bool{
+	return false
 }
 func (mn *MockNetwork) SendFindContactMessage(contact *Contact, target *KademliaID) CloseContacts{
 	time.Sleep(10000)
@@ -96,7 +96,7 @@ func TestBootstrap(t *testing.T) {
 		base = tmp
 		randRTs = append(randRTs, *base.rt)
 	}
-	fmt.Println(base.rt.root)
+	//fmt.Println(base.rt.root)
 }
 
 func TestKademlia(t *testing.T) {
@@ -155,12 +155,12 @@ func testFindNode(t *testing.T) {
 	var look Contact = randRTs[10].me
 	var cc CloseContacts = kad.FindNode(&look)
 	for i := 0; i < len(cc); i++ {
-		fmt.Println(cc[i])
+		//fmt.Println(cc[i])
 	}
 	look = NewContact(NewRandomKademliaID(), "")
 	cc = kad.FindNode(&look)
 	fmt.Println("------------")
 	for i := 0; i < len(cc); i++ {
-		fmt.Println(cc[i])
+		//fmt.Println(cc[i])
 	}
 }

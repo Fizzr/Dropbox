@@ -106,7 +106,7 @@ func TestProtobufNetwork(t *testing.T) {
 }
 
 func TestGetResponse(t *testing.T) {
-	net := NewNetwork("localhost","8011")
+	net := NewNetwork("localhost","8011", nil)
 	ID := 2
 	a:= func () {
 		time.Sleep(100 * time.Millisecond)
@@ -119,12 +119,12 @@ func TestGetResponse(t *testing.T) {
 	}
 	var bueno bool = true;
 	go a()
-	response := net.getResponse(int64(ID))
+	response := *net.getResponse(int64(ID))
 	//fmt.Printf("%T\n",response.Type)
 	//fmt.Println(response)
 	bueno = bueno && response.MessageID == int64(ID)
-	response = net.getResponse(int64(11))
-	bueno = bueno && response.MessageID == 0
+	nilResponse := net.getResponse(int64(11))
+	bueno = bueno && nilResponse == nil
 	if(bueno){
 		fmt.Println("Success - Network getResponse")
 	}else {
@@ -134,12 +134,35 @@ func TestGetResponse(t *testing.T) {
 
 func TestComunnications2(t *testing.T) {
 	//fmt.Println("222")
-	net1 := NewNetwork("localhost","8025")
-	net2 := NewNetwork("localhost","8026")
-	c1 := NewContact(NewRandomKademliaID(), "localhost:8025")
-	c2 := NewContact(NewKademliaID("53FAFFFBB0230099001E200000000C0000000000"), "localhost:8026")
-	net1.me = *c1.ID
-	net2.me = *c2.ID
-	time.Sleep(1000000)
-	fmt.Printf("Ping: %v\n", net1.SendPingMessage(&c2))
+	var a1, a2 string = "localhost", "localhost"
+	var p1, p2 string = "8025", "8026"
+	var net1, net2 Network
+	kad1 := NewKademlia(a1+":"+p1, &net1, nil)
+	kad2 := NewKademlia(a2+":"+p2, &net2, nil)
+	net1 = NewNetwork(a1, p1, kad1)
+	net2 = NewNetwork(a2, p2, kad2)
+	
+	time.Sleep(1 * time.Second)
+	var bueno bool = net1.SendPingMessage(&kad2.rt.me)
+	if bueno {
+		fmt.Println("Success - Network Ping")
+	} else {
+		t.Fail()
+	}
+	bueno = true
+	var target *KademliaID = NewRandomKademliaID()
+	
+	var cc CloseContacts = net1.SendFindContactMessage(&kad2.rt.me, target)
+	
+	bueno = len(cc) == 1
+	if(!bueno) { fmt.Printf("Expected length 1, found %d\n", len(cc))}
+	bueno = bueno && cc[0].contact.ID.Equals(kad2.rt.me.ID)
+	if(!bueno) { fmt.Println("Expected ID %v, found %v\n", kad2.rt.me.ID, cc[0].contact.ID)}
+	bueno = bueno && cc[0].distance.Equals(kad2.rt.me.ID.CalcDistance(target))
+		if(!bueno) { fmt.Printf("Expected distance %v, found %v\n",kad1.rt.me.ID.CalcDistance(kad2.rt.me.ID), cc[0].distance)}
+	if bueno {
+		fmt.Println("Success - Network FindContact")
+	} else {
+		t.Fail()
+	}
 }

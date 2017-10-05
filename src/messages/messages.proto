@@ -57,4 +57,5 @@ message contact
 {
 	string ID = 1;
 	string address = 2;
+	string distance = 3;
 }
