@@ -10,6 +10,7 @@ import (
 	proto "github.com/golang/protobuf/proto"
 )
 
+//helper function
 func writeByte(address string, b []byte) {
 	var laddr, raddr *net.UDPAddr
 
@@ -26,6 +27,7 @@ func writeByte(address string, b []byte) {
 }
 
 func TestNetwork(t *testing.T) {
+	//Simple network test
 	var addr *net.UDPAddr
 	addr, err := net.ResolveUDPAddr("udp", "localhost:8001")
 
@@ -57,9 +59,9 @@ func TestNetwork(t *testing.T) {
 }
 
 func TestProtobufNetwork(t *testing.T) {
+	//Simple Protobuf test
 	var addr *net.UDPAddr
 	addr, err := net.ResolveUDPAddr("udp", "localhost:8001")
-
 	var a messages.Message = messages.Message{}
 	sender := &messages.Contact{}
 	sender.ID = "12344321"
@@ -106,11 +108,12 @@ func TestProtobufNetwork(t *testing.T) {
 }
 
 func TestGetResponse(t *testing.T) {
+	//Case 1: Normal Operations. Listen for an ID that we find
 	net := NewNetwork("localhost","8011", nil)
 	ID := 2
 	a:= func () {
 		time.Sleep(100 * time.Millisecond)
-		tmp := messages.Response{int64(ID), 1, nil}
+		tmp := messages.Response{int64(ID), messages.Response_FINDNODE, nil, nil}
 		net.responseCond.L.Lock()
 		*net.responseList = append(*net.responseList, tmp)
 		*net.newResponse = true
@@ -120,11 +123,17 @@ func TestGetResponse(t *testing.T) {
 	var bueno bool = true;
 	go a()
 	response := *net.getResponse(int64(ID))
-	//fmt.Printf("%T\n",response.Type)
-	//fmt.Println(response)
 	bueno = bueno && response.MessageID == int64(ID)
+	
+	//Case 2: Listen for a Response that never arrives
 	nilResponse := net.getResponse(int64(11))
 	bueno = bueno && nilResponse == nil
+	
+	//Case 3: Listen for a Response that never arrives, while there are other messages in the buffer.
+	go a()
+	response3 := net.getResponse(int64(ID+1))
+	bueno = bueno && response3 == nil
+	fmt.Println(response3)
 	if(bueno){
 		fmt.Println("Success - Network getResponse")
 	}else {
@@ -135,7 +144,7 @@ func TestGetResponse(t *testing.T) {
 func TestComunnications2(t *testing.T) {
 	//fmt.Println("222")
 	var a1, a2 string = "localhost", "localhost"
-	var p1, p2 string = "8025", "8026"
+	var p1, p2 string = "8003", "8004"
 	var net1, net2 Network
 	kad1 := NewKademlia(a1+":"+p1, &net1, nil)
 	kad2 := NewKademlia(a2+":"+p2, &net2, nil)
@@ -143,12 +152,16 @@ func TestComunnications2(t *testing.T) {
 	net2 = NewNetwork(a2, p2, kad2)
 	
 	time.Sleep(1 * time.Second)
+	
+	//Case 1: Test Ping send and response
 	var bueno bool = net1.SendPingMessage(&kad2.rt.me)
 	if bueno {
 		fmt.Println("Success - Network Ping")
 	} else {
 		t.Fail()
 	}
+	
+	//Case 2.1: Test SendFindContactMessage and response
 	bueno = true
 	var target *KademliaID = NewRandomKademliaID()
 	
@@ -159,7 +172,22 @@ func TestComunnications2(t *testing.T) {
 	bueno = bueno && cc[0].contact.ID.Equals(kad2.rt.me.ID)
 	if(!bueno) { fmt.Println("Expected ID %v, found %v\n", kad2.rt.me.ID, cc[0].contact.ID)}
 	bueno = bueno && cc[0].distance.Equals(kad2.rt.me.ID.CalcDistance(target))
-		if(!bueno) { fmt.Printf("Expected distance %v, found %v\n",kad1.rt.me.ID.CalcDistance(kad2.rt.me.ID), cc[0].distance)}
+	if(!bueno) { fmt.Printf("Expected distance %v, found %v\n",kad1.rt.me.ID.CalcDistance(kad2.rt.me.ID), cc[0].distance)}
+	
+	//Case 3.1: Test SendFindDataMessage and response with only contacts
+	
+	//Case 3.2: Test SendFindDataMessage and response with only data
+	
+	//Case 4: Test Store message, and check storage in other node
+	
+	//Case 2.2 Test SendFindContactMessage and response with a lot of returned nodes!
+	for i := 0; i < 40; i ++ {
+		kad2.rt.AddContact(NewContact(NewRandomKademliaID(), fmt.Sprintf("localhost:%d",8050+i)))
+	}
+	var cc2 CloseContacts = net1.SendFindContactMessage(&kad2.rt.me, target)
+
+	fmt.Println(len(cc2))
+	
 	if bueno {
 		fmt.Println("Success - Network FindContact")
 	} else {

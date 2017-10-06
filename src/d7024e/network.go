@@ -17,8 +17,8 @@ type responses []messages.Response
 type Net interface {
 	SendPingMessage(contact *Contact) bool
 	SendFindContactMessage(contact *Contact, target *KademliaID) CloseContacts
-	SendFindDataMessage(hash string)
-	SendStoreMessage(data []byte)
+	SendFindDataMessage(contact *Contact, hash string) (*CloseContacts, *[]byte)
+	SendStoreMessage(contact *Contact, data []byte)
 }
 
 type Network struct {
@@ -60,7 +60,7 @@ func (net *Network) getMessageID() int64 {
 
 
 func (net *Network) getResponse (ID int64) *messages.Response{
-	// IMPORTANT! Response might not ever arrive (UDP)! Add some robust timeout options
+	// IMPORTANT! Response might not ever arrive (UDP)!
 	// Also, add timeout for messages in queue, to save memory and prevent unecessary looping
 	var start time.Time = time.Now()
 	for {
@@ -69,9 +69,9 @@ func (net *Network) getResponse (ID int64) *messages.Response{
 			return nil
 		}
 		net.responseCond.L.Lock()
-		defer net.responseCond.L.Unlock()
 		for(!*net.newResponse) {
 			if(time.Since(start) > timeout) {
+				net.responseCond.L.Unlock()
 				return nil
 			}
 			net.responseCond.Wait()
@@ -83,9 +83,11 @@ func (net *Network) getResponse (ID int64) *messages.Response{
 				if len(*net.responseList) == 0 {
 					*net.newResponse = false
 				}
+				net.responseCond.L.Unlock()
 				return &a
 			}
 		}
+		net.responseCond.L.Unlock()
 	}
 	return nil
 }
@@ -115,7 +117,7 @@ func (network *Network) Listen() {
 	CheckError(err)
 	defer ServerConn.Close()
 	//fmt.Println("Ip: " + network.address + " and Port " + network.port)
-	buff := make([]byte, 1024)
+	buff := make([]byte, 4096)	//This number is pretty arbitrary. But it fits 20 contacts being returned! 4kb might not fit data returns tho...
 
 	for {
 		n, err := ServerConn.Read(buff)
@@ -182,7 +184,7 @@ func (network *Network) respondPingMessage(received messages.Message) {
 
 	var msg messages.Message = network.newRespondMessage()
 
-	var ping messages.Response = messages.Response{received.Request.MessageID, messages.Response_PING, nil}
+	var ping messages.Response = messages.Response{received.Request.MessageID, messages.Response_PING, nil, nil}
 	msg.Response = &ping
 	//fmt.Println("messege to send ",msg)
 	var buff []byte
@@ -252,14 +254,13 @@ func (network *Network) respondFindNodeMessage(received messages.Message) {
 	defer Conn.Close()
 
 	_,err = Conn.Write(buff)
+	//fmt.Printf("Responded with %d bytes\n", n)
 	CheckError(err)
 }
 
 func (network *Network) SendFindContactMessage(contact *Contact, target *KademliaID) CloseContacts{
-	//fmt.Println("send find")
 	ServerAddr, err := net.ResolveUDPAddr("udp", contact.Address)
-	CheckError(err)
-	
+	CheckError(err)	
 	Conn, err := net.DialUDP("udp", nil, ServerAddr)
 	CheckError(err)
 	defer Conn.Close()
@@ -289,10 +290,80 @@ func (network *Network) SendFindContactMessage(contact *Contact, target *Kademli
 	return res
 }
 
-func (network *Network) SendFindDataMessage(hash string) {
-	// TODO
+func (network *Network) respondFindDataMessage(received messages.Message) {
+	var msg messages.Message = newResponseMessage()
+	var response messages.Response = messages.Response{}
+	response.MessageID = received.Request.MessageID
+	
+	//FIND DATA IN FILE 
+	var data []byte
+	var dataFound bool = false
+	
+	if(dataFound) {
+		response.Data = data
+		response.Type = messages.Response_FINDDATA_FOUND
+	} else {
+		response.Type = messages.Response_FINDDATA_NODES
+		var cc CloseContacts = network.kad.rt.FindClosestContacts(NewKademliaID(received.Request.ID), k)
+		for i := 0; i < len(cc); i++ {
+			var cont messages.Contact = messages.Contact{fmt.Sprint(cc[i].contact.ID), cc[i].contact.Address, fmt.Sprint(cc[i].distance)}
+			response.Contacts = append(response.Contacts, &cont)
+		}
+	}
+	msg.Response = response
+	var buff []byte
+	buff, err := proto.Marshal(&msg)
+	CheckError(err)
+	
+	ServerAddr, err := net.ResolveUDPAddr("udp", received.Sender.Address)
+	CheckError(err)
+	Conn, err := net.DialUDP("udp", nil, ServerAddr)
+	CheckError(err)
+	defer Conn.Close()
+
+	_,err = Conn.Write(buff)
+	//fmt.Printf("Responded with %d bytes\n", n)
+	CheckError(err)
 }
 
-func (network *Network) SendStoreMessage(data []byte) {
+func (network *Network) SendFindDataMessage(contact *Contact, hash string) (*CloseContacts, *[]byte) {
+	ServerAddr, err := net.ResolveUDPAddr("udp", contact.Address)
+	CheckError(err)	
+	Conn, err := net.DialUDP("udp", nil, ServerAddr)
+	CheckError(err)
+	defer Conn.Close()
+
+	var msg messages.Message = network.newRequestMessage()
+	var mID int64 = network.getMessageID()
+	msg.Request = &messages.Request{mID, messages.Request_FINDDATA, hash}
+	
+	var buff []byte
+	buff, err = proto.Marshal(&msg)
+	CheckError(err)
+	_, err = Conn.Write(buff)
+	//fmt.Printf("wrote %d bytes\n", n)
+	if err != nil {
+		fmt.Println(msg, err)
+	}
+	var response *messages.Response = network.getResponse(mID)
+	//fmt.Println("response ", response)
+	if(response == nil){
+		return nil, nil
+	}
+	if(response.Type == messages.Response_FINDDATA_FOUND) {
+		return nil, &response.Data
+	} else if (response.Type == messages.Response_FINDDATA_NODES) {
+		var res CloseContacts
+		for i := 0; i < len(response.Contacts); i ++ {
+			res = append(res, CloseContact{Contact{NewKademliaID(response.Contacts[i].ID), response.Contacts[i].Address}, NewKademliaID(response.Contacts[i].Distance)})
+		}
+		return &res, nil
+	} else {
+		fmt.Println("Error: Mismatched response type in FINDDATA! Received ", response.Type)
+		return nil, nil
+	}
+}
+
+func (network *Network) SendStoreMessage(contact *Contact, data []byte) {
 	// TODO
 }

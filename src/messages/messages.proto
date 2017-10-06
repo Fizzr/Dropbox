@@ -33,7 +33,7 @@ message request
 		STORE		= 3;
 		
 	}
-	int64 messageID = 1;
+	int64 messageID = 1;	//messageID put here so that the surrounding Message container can be removed when storing.
 	Type type = 2;
 	string ID = 3;
 }
@@ -48,9 +48,10 @@ message response
 		FINDDATA_NODES = 3;
 		STORE = 4;
 	}
-	int64 messageID = 1;
+	int64 messageID = 1;	//Same as above
 	Type type = 2;
 	repeated contact contacts = 3;
+	bytes data = 4;
 }
 
 message contact

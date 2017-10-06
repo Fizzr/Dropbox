@@ -24,6 +24,7 @@ type asyncStruct struct {
 	activeThreads int
 	wg            *sync.WaitGroup
 	run           bool
+	parent		  *Kademlia
 }
 
 func NewKademlia(address string, network Net, base *Contact) *Kademlia{
@@ -43,9 +44,9 @@ func NewKademlia(address string, network Net, base *Contact) *Kademlia{
 	return k
 }
 
-func NewAsyncStruct(base CloseContacts) *asyncStruct{
+func (kad *Kademlia) NewAsyncStruct(base CloseContacts) *asyncStruct{
 	var wg sync.WaitGroup
-	return &asyncStruct{base, nil, &sync.Cond{L: &sync.Mutex{}}, 0, 0, &wg, true}
+	return &asyncStruct{base, nil, &sync.Cond{L: &sync.Mutex{}}, 0, 0, &wg, true, kad}
 }
 
 func (as *asyncStruct) getNext() *CloseContact {
@@ -93,13 +94,12 @@ func (as *asyncStruct) addResult(res CloseContacts) {
 	//So we can step throught them together, and see if they are equals or not
 	//Insert elements from res into index of cc if res is less than cc element
 	//If they are the same, discard res element
-	/*for i:= 0; i < len(as.cc); i++ {
-		fmt.Printf("Input cc - %v\n", as.cc[i])
-	}
-	for i:= 0; i < len(res); i++ {
-		fmt.Printf("Input res - %v\n", res[i])
-	}*/
 
+	//add new contacts
+	for i := 0; i < len(res); i++ {
+		go kad.rt.AddContact(res[i].Contact)
+	}
+	
 	var newCC CloseContacts = make([]CloseContact, 0, len(res)+len(as.cc))
 	//fmt.Printf("resLen %d ccLen %d newCCLen %d\n",len(res), len(as.cc), len(newCC))
 	for i, j, k := 0, 0, 0; j+i < len(as.cc)+len(res); {
@@ -159,7 +159,7 @@ func (kademlia *Kademlia) asyncLookup(target *Contact, as *asyncStruct, result *
 		//fmt.Printf("Thread %v - len %v\n", num, len(a))
 		for i := 0; i < len(a); i++ {
 			//fmt.Printf("Thread %v - result %s\n",num, a[i])
-			go kademlia.rt.AddContact(a[i].contact)
+			//go kademlia.rt.AddContact(a[i].contact)
 			if a[i].contact.ID.Equals(target.ID) {
 				*result = a[i].contact
 				//fmt.Printf("AAAAAAAAAAA %v\n", a[i].contact)
@@ -184,7 +184,7 @@ func (kademlia *Kademlia) LookupContact(target *Contact) *Contact {
 		}
 	}
 	// Step 3. If not, send LookupContact to k closest contacts, including returned values, running alpha number of lookups in parallel
-	var as *asyncStruct = NewAsyncStruct(cc)
+	var as *asyncStruct = kademlia.NewAsyncStruct(cc)
 	//alpha = 1
 	as.wg.Add(alpha)
 	var result *Contact = &Contact{}
@@ -205,9 +205,9 @@ func (kademlia *Kademlia) asyncFindNode(target *Contact, as *asyncStruct) {
 			return
 		}
 		var a CloseContacts = kademlia.network.SendFindContactMessage(&c.contact, target.ID)
-		for i:=0; i < len(a); i++ {
+		/*for i:=0; i < len(a); i++ {
 			go kademlia.rt.AddContact(a[i].contact)
-		}
+		}*/
 		as.addResult(a)
 	}
 }
@@ -215,7 +215,7 @@ func (kademlia *Kademlia) asyncFindNode(target *Contact, as *asyncStruct) {
 func (kademlia *Kademlia) FindNode(target *Contact) CloseContacts {
 	//fmt.Println("FIND THAT MOTHAFUCKA!")
 	var cc CloseContacts = kademlia.rt.FindClosestContacts(target.ID, alpha)
-	var as *asyncStruct = NewAsyncStruct(cc)
+	var as *asyncStruct = kademlia.NewAsyncStruct(cc)
 	as.wg.Add(alpha)
 	for i := 0; i < alpha; i++ {
 		go kademlia.asyncFindNode(target, as)
