@@ -2,6 +2,7 @@ package d7024e
 
 import (
 	"crypto/sha1"
+	"fmt"
 	"sync"
 	//	"sync/atomic"
 	"sort"
@@ -14,6 +15,7 @@ const alpha = 3
 type Kademlia struct {
 	rt      *RoutingTable
 	network Net
+	data    map[string]*[]byte
 }
 
 type asyncStruct struct {
@@ -225,11 +227,50 @@ func (kademlia *Kademlia) FindNode(target *Contact) CloseContacts {
 	return result
 }
 
-func (kademlia *Kademlia) LookupData(hash string) {
-	// Step 1.Look for data in own hashtable. If found, return
-	// Step 2. If not, Similar to lookupContact, Send lookupData request to k closest, running alpha number of lookups in parallel
-	// (Step 2 makes sense if we call LookupData through console, but not if someone call it on us... Same for LookupData)
-	// Step 3.If file found, return it
+func (kademlia *Kademlia) asyncLookupData(hash string, as *asyncStruct, resultdata *[]byte) {
+	defer as.wg.Done()
+	for as.run {
+		var c *CloseContact = as.getNext()
+		if c == nil {
+			return
+		}
+
+		//fmt.Printf("Thread %v - Searching %s\n", num, c)
+		newconts, data := kademlia.network.SendFindDataMessage(&c.contact, &hash)
+		if data != nil {
+			fmt.Println("Data is Found!")
+			*resultdata = data
+			as.run = false
+		} else {
+			as.addResult(newconts)
+		}
+
+		/* Three different Cases:
+		nil, []byte
+		closeco, nil
+		nil, nil
+		*/
+	}
+}
+
+func (kademlia *Kademlia) LookupData(hash string) *[]byte {
+
+	/*
+		for key, value := range kademlia.data {
+			fmt.Println("Key:", key, "Value:", value)
+		}*/
+
+	if val, ok := kademlia.data[hash]; ok {
+		fmt.Printf("Value is:", val)
+		return val
+	} else {
+		// Do Search asyncLookupData
+		var cc CloseContacts = kademlia.rt.FindClosestContacts(NewKademliaID(hash), alpha)
+		var as *asyncStruct = NewAsyncStruct(cc)
+		var resultdata *[]byte
+		kademlia.asyncLookupData(hash, as, resultdata)
+		return resultdata
+	}
 }
 
 func (kademlia *Kademlia) Store(data []byte) {
@@ -238,9 +279,13 @@ func (kademlia *Kademlia) Store(data []byte) {
 	hasher := sha1.New()
 	hasher.Write(data)
 
+	//sData := kademlia.LookupContact(NewKademlia(hasher), true)
 	// Store data in own file (I think?)
 
 	// Do lookup on data handle (I think?)
+
 	// Store data in k closest nodes (I think?)
+
 	// return handle
+
 }
