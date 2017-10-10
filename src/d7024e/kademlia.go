@@ -2,6 +2,7 @@ package d7024e
 
 import (
 	"crypto/sha1"
+	"encoding/base64"
 	"fmt"
 	"sync"
 	//	"sync/atomic"
@@ -31,7 +32,7 @@ type asyncStruct struct {
 func NewKademlia(address string, network Net, base *Contact) *Kademlia {
 	var c Contact = NewContact(NewRandomKademliaID(), address)
 	var rt *RoutingTable = NewRoutingTable(c)
-	var k = Kademlia{rt, network}
+	var k = Kademlia{rt, network, nil} // Data has the third struct.
 	if base != nil {
 		rt.AddContact(*base)
 		k.FindNode(&c)
@@ -234,7 +235,6 @@ func (kademlia *Kademlia) asyncLookupData(hash string, as *asyncStruct, resultda
 		if c == nil {
 			return
 		}
-
 		//fmt.Printf("Thread %v - Searching %s\n", num, c)
 		newconts, data := kademlia.network.SendFindDataMessage(&c.contact, &hash)
 		if data != nil {
@@ -254,12 +254,10 @@ func (kademlia *Kademlia) asyncLookupData(hash string, as *asyncStruct, resultda
 }
 
 func (kademlia *Kademlia) LookupData(hash string) *[]byte {
-
 	/*
 		for key, value := range kademlia.data {
 			fmt.Println("Key:", key, "Value:", value)
 		}*/
-
 	if val, ok := kademlia.data[hash]; ok {
 		fmt.Printf("Value is:", val)
 		return val
@@ -278,8 +276,13 @@ func (kademlia *Kademlia) Store(data []byte) {
 	// Hash data to get handle
 	hasher := sha1.New()
 	hasher.Write(data)
+	sha := base64.URLEncoding.EncodeToString(hasher.Sum(nil))
 
-	//sData := kademlia.LookupContact(NewKademlia(hasher), true)
+	var cc CloseContacts = kademlia.rt.FindClosestContacts(NewKademliaID(sha), alpha)
+
+	for i := 0; i < len(cc); i++ {
+		kademlia.network.SendStoreMessage(sha)
+	}
 	// Store data in own file (I think?)
 
 	// Do lookup on data handle (I think?)
