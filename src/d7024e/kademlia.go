@@ -5,8 +5,8 @@ import (
 	"encoding/base64"
 	"sync"
 	//	"sync/atomic"
-	"sort"
 	"fmt"
+	"sort"
 )
 
 const k = 20
@@ -26,7 +26,7 @@ type asyncStruct struct {
 	activeThreads int
 	wg            *sync.WaitGroup
 	run           bool
-	parent		  *Kademlia
+	parent        *Kademlia
 }
 
 func NewKademlia(address string, port string, base *Contact) *Kademlia {
@@ -36,32 +36,32 @@ func NewKademlia(address string, port string, base *Contact) *Kademlia {
 	var data map[string]*[]byte = make(map[string]*[]byte)
 	var k *Kademlia = &Kademlia{rt, &net, data}
 	net = NewNetwork(address, port, k)
-	
-	if base != nil {
-		k.rt.AddContact(*base)
-		k.FindNode(&c)
-	}
-	return k	
-}
 
-func newKademlia(address string, network Net, base *Contact) *Kademlia{
-	var c Contact = NewContact(NewRandomKademliaID(), address)
-	//fmt.Printf("%T", network)
-	if(fmt.Sprintf("%T", network) == "*d7024e.MockNetwork") {
-		network.(*MockNetwork).me = &c
-	}
-	var rt *RoutingTable = NewRoutingTable(c)
-	var data map[string]*[]byte = make(map[string]*[]byte)
-	var k *Kademlia = &Kademlia{rt, network, data}
 	if base != nil {
-//		fmt.Println("a")
 		k.rt.AddContact(*base)
 		k.FindNode(&c)
 	}
 	return k
 }
 
-func (kad *Kademlia) NewAsyncStruct(base CloseContacts) *asyncStruct{
+func newKademlia(address string, network Net, base *Contact) *Kademlia {
+	var c Contact = NewContact(NewRandomKademliaID(), address)
+	//fmt.Printf("%T", network)
+	if fmt.Sprintf("%T", network) == "*d7024e.MockNetwork" {
+		network.(*MockNetwork).me = &c
+	}
+	var rt *RoutingTable = NewRoutingTable(c)
+	var data map[string]*[]byte = make(map[string]*[]byte)
+	var k *Kademlia = &Kademlia{rt, network, data}
+	if base != nil {
+		//		fmt.Println("a")
+		k.rt.AddContact(*base)
+		k.FindNode(&c)
+	}
+	return k
+}
+
+func (kad *Kademlia) NewAsyncStruct(base CloseContacts) *asyncStruct {
 	var wg sync.WaitGroup
 	return &asyncStruct{base, nil, &sync.Cond{L: &sync.Mutex{}}, 0, 0, &wg, true, kad}
 }
@@ -116,7 +116,7 @@ func (as *asyncStruct) addResult(res CloseContacts) {
 	for i := 0; i < len(res); i++ {
 		go as.parent.rt.AddContact(res[i].contact)
 	}
-	
+
 	var newCC CloseContacts = make([]CloseContact, 0, len(res)+len(as.cc))
 	//fmt.Printf("resLen %d ccLen %d newCCLen %d\n",len(res), len(as.cc), len(newCC))
 	for i, j, k := 0, 0, 0; j+i < len(as.cc)+len(res); {
@@ -244,7 +244,7 @@ func (kademlia *Kademlia) FindNode(target *Contact) CloseContacts {
 			i--
 		}
 	}
-	if(len(result) < k){
+	if len(result) < k {
 		return result
 	}
 	return result[:k]
