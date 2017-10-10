@@ -14,6 +14,7 @@ const alpha = 3
 type Kademlia struct {
 	rt      *RoutingTable
 	network Net
+	data    map[string]*[]byte
 }
 
 type asyncStruct struct {
@@ -31,7 +32,8 @@ func NewKademlia(address string, port string, base *Contact) *Kademlia {
 	var c Contact = NewContact(NewRandomKademliaID(), address+":"+port)
 	var rt *RoutingTable = NewRoutingTable(c)
 	var net Network
-	var k *Kademlia = &Kademlia{rt, &net}
+	var data map[string]*[]byte = make(map[string]*[]byte)
+	var k *Kademlia = &Kademlia{rt, &net, data}
 	net = NewNetwork(address, port, k)
 	
 	if base != nil {
@@ -48,7 +50,8 @@ func newKademlia(address string, network Net, base *Contact) *Kademlia{
 		network.(*MockNetwork).me = &c
 	}
 	var rt *RoutingTable = NewRoutingTable(c)
-	var k *Kademlia = &Kademlia{rt, network}
+	var data map[string]*[]byte = make(map[string]*[]byte)
+	var k *Kademlia = &Kademlia{rt, network, data}
 	if base != nil {
 //		fmt.Println("a")
 		k.rt.AddContact(*base)
@@ -156,7 +159,6 @@ func (as *asyncStruct) addResult(res CloseContacts) {
 	as.cond.L.Unlock()
 }
 
-
 func (kademlia *Kademlia) asyncLookup(target *Contact, as *asyncStruct, result *Contact, num int) {
 	defer as.wg.Done()
 	for as.run {
@@ -218,9 +220,7 @@ func (kademlia *Kademlia) asyncFindNode(target *Contact, as *asyncStruct) {
 			return
 		}
 		var a CloseContacts = kademlia.network.SendFindContactMessage(&c.contact, target.ID)
-		/*for i:=0; i < len(a); i++ {
-			go kademlia.rt.AddContact(a[i].contact)
-		}*/
+
 		as.addResult(a)
 	}
 }
@@ -249,11 +249,50 @@ func (kademlia *Kademlia) FindNode(target *Contact) CloseContacts {
 	return result[:k]
 }
 
-func (kademlia *Kademlia) LookupData(hash string) {
-	// Step 1.Look for data in own hashtable. If found, return
-	// Step 2. If not, Similar to lookupContact, Send lookupData request to k closest, running alpha number of lookups in parallel
-	// (Step 2 makes sense if we call LookupData through console, but not if someone call it on us... Same for LookupData)
-	// Step 3.If file found, return it
+func (kademlia *Kademlia) asyncLookupData(hash string, as *asyncStruct, resultdata *[]byte) {
+	defer as.wg.Done()
+	for as.run {
+		var c *CloseContact = as.getNext()
+		if c == nil {
+			return
+		}
+
+		//fmt.Printf("Thread %v - Searching %s\n", num, c)
+		newconts, data := kademlia.network.SendFindDataMessage(&c.contact, hash)
+		if data != nil {
+			fmt.Println("Data is Found!")
+			resultdata = data
+			as.run = false
+		} else {
+			as.addResult(*newconts)
+		}
+
+		/* Three different Cases:
+		nil, []byte
+		closeco, nil
+		nil, nil
+		*/
+	}
+}
+
+func (kademlia *Kademlia) LookupData(hash string) *[]byte {
+
+	/*
+		for key, value := range kademlia.data {
+			fmt.Println("Key:", key, "Value:", value)
+		}*/
+
+	if val, ok := kademlia.data[hash]; ok {
+		fmt.Printf("Value is:", val)
+		return val
+	} else {
+		// Do Search asyncLookupData
+		var cc CloseContacts = kademlia.rt.FindClosestContacts(NewKademliaID(hash), alpha)
+		var as *asyncStruct = kademlia.NewAsyncStruct(cc)
+		var resultdata *[]byte
+		kademlia.asyncLookupData(hash, as, resultdata)
+		return resultdata
+	}
 }
 
 func (kademlia *Kademlia) Store(data []byte) {
@@ -262,9 +301,13 @@ func (kademlia *Kademlia) Store(data []byte) {
 	hasher := sha1.New()
 	hasher.Write(data)
 
+	//sData := kademlia.LookupContact(NewKademlia(hasher), true)
 	// Store data in own file (I think?)
 
 	// Do lookup on data handle (I think?)
+
 	// Store data in k closest nodes (I think?)
+
 	// return handle
+
 }

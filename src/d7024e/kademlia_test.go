@@ -135,7 +135,7 @@ func testLookupContact(t *testing.T) {
 	//Don't want to run the bootstrap in test
 	var c Contact = NewContact(NewRandomKademliaID(), "localhost:8001")
 	var rt *RoutingTable = NewRoutingTable(c)
-	var kad *Kademlia = &Kademlia{rt, mn}
+	var kad *Kademlia = &Kademlia{rt, mn, nil}
 	rt.AddContact(base)
 	var look Contact = randRTs[22].me
 	var ret *Contact = kad.LookupContact(&look)
@@ -163,7 +163,7 @@ func testFindNode(look Contact, correct CloseContacts, t *testing.T) {
 	//Don't want to run the bootstrap in test
 	var c Contact = NewContact(NewRandomKademliaID(), "localhost:8001")
 	var rt *RoutingTable = NewRoutingTable(c)
-	var kad *Kademlia = &Kademlia{rt, mn}
+	var kad *Kademlia = &Kademlia{rt, mn, nil}
 	rt.AddContact(base)
 	//var kad *Kademlia = NewKademlia("localhost:8001", mn, &base)	var look Contact = randRTs[10].me
 	var cc CloseContacts = kad.FindNode(&look)
