@@ -36,6 +36,7 @@ message request
 	int64 messageID = 1;	//messageID put here so that the surrounding Message container can be removed when storing.
 	Type type = 2;
 	string ID = 3;
+	bytes data = 4;
 }
 
 message response 

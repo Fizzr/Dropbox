@@ -68,7 +68,7 @@ func (mn *MockNetwork) SendFindContactMessage(contact *Contact, target *Kademlia
 func (mn *MockNetwork) SendFindDataMessage(contact *Contact, hash string) (*CloseContacts, *[]byte) {
 	return nil, nil
 }
-func (mn *MockNetwork) SendStoreMessage(contact *Contact, data []byte) {
+func (mn *MockNetwork) SendStoreMessage(contact *Contact, hash string, data []byte) {
 	return
 }
 
