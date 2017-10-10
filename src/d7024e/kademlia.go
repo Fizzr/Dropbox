@@ -3,11 +3,10 @@ package d7024e
 import (
 	"crypto/sha1"
 	"encoding/base64"
-	"fmt"
 	"sync"
 	//	"sync/atomic"
 	"sort"
-	//	"fmt"
+	"fmt"
 )
 
 const k = 20
@@ -27,22 +26,44 @@ type asyncStruct struct {
 	activeThreads int
 	wg            *sync.WaitGroup
 	run           bool
+	parent		  *Kademlia
 }
 
-func NewKademlia(address string, network Net, base *Contact) *Kademlia {
-	var c Contact = NewContact(NewRandomKademliaID(), address)
+func NewKademlia(address string, port string, base *Contact) *Kademlia {
+	var c Contact = NewContact(NewRandomKademliaID(), address+":"+port)
 	var rt *RoutingTable = NewRoutingTable(c)
-	var k = Kademlia{rt, network, nil} // Data has the third struct.
+	var net Network
+	var data map[string]*[]byte = make(map[string]*[]byte)
+	var k *Kademlia = &Kademlia{rt, &net, data}
+	net = NewNetwork(address, port, k)
+	
 	if base != nil {
-		rt.AddContact(*base)
+		k.rt.AddContact(*base)
 		k.FindNode(&c)
 	}
-	return &k
+	return k	
 }
 
-func NewAsyncStruct(base CloseContacts) *asyncStruct {
+func newKademlia(address string, network Net, base *Contact) *Kademlia{
+	var c Contact = NewContact(NewRandomKademliaID(), address)
+	//fmt.Printf("%T", network)
+	if(fmt.Sprintf("%T", network) == "*d7024e.MockNetwork") {
+		network.(*MockNetwork).me = &c
+	}
+	var rt *RoutingTable = NewRoutingTable(c)
+	var data map[string]*[]byte = make(map[string]*[]byte)
+	var k *Kademlia = &Kademlia{rt, network, data}
+	if base != nil {
+//		fmt.Println("a")
+		k.rt.AddContact(*base)
+		k.FindNode(&c)
+	}
+	return k
+}
+
+func (kad *Kademlia) NewAsyncStruct(base CloseContacts) *asyncStruct{
 	var wg sync.WaitGroup
-	return &asyncStruct{base, nil, &sync.Cond{L: &sync.Mutex{}}, 0, 0, &wg, true}
+	return &asyncStruct{base, nil, &sync.Cond{L: &sync.Mutex{}}, 0, 0, &wg, true, kad}
 }
 
 func (as *asyncStruct) getNext() *CloseContact {
@@ -90,13 +111,12 @@ func (as *asyncStruct) addResult(res CloseContacts) {
 	//So we can step throught them together, and see if they are equals or not
 	//Insert elements from res into index of cc if res is less than cc element
 	//If they are the same, discard res element
-	/*for i:= 0; i < len(as.cc); i++ {
-		fmt.Printf("Input cc - %v\n", as.cc[i])
-	}
-	for i:= 0; i < len(res); i++ {
-		fmt.Printf("Input res - %v\n", res[i])
-	}*/
 
+	//add new contacts
+	for i := 0; i < len(res); i++ {
+		go as.parent.rt.AddContact(res[i].contact)
+	}
+	
 	var newCC CloseContacts = make([]CloseContact, 0, len(res)+len(as.cc))
 	//fmt.Printf("resLen %d ccLen %d newCCLen %d\n",len(res), len(as.cc), len(newCC))
 	for i, j, k := 0, 0, 0; j+i < len(as.cc)+len(res); {
@@ -155,7 +175,7 @@ func (kademlia *Kademlia) asyncLookup(target *Contact, as *asyncStruct, result *
 		//fmt.Printf("Thread %v - len %v\n", num, len(a))
 		for i := 0; i < len(a); i++ {
 			//fmt.Printf("Thread %v - result %s\n",num, a[i])
-			go kademlia.rt.AddContact(a[i].contact)
+			//go kademlia.rt.AddContact(a[i].contact)
 			if a[i].contact.ID.Equals(target.ID) {
 				*result = a[i].contact
 				//fmt.Printf("AAAAAAAAAAA %v\n", a[i].contact)
@@ -180,7 +200,7 @@ func (kademlia *Kademlia) LookupContact(target *Contact) *Contact {
 		}
 	}
 	// Step 3. If not, send LookupContact to k closest contacts, including returned values, running alpha number of lookups in parallel
-	var as *asyncStruct = NewAsyncStruct(cc)
+	var as *asyncStruct = kademlia.NewAsyncStruct(cc)
 	//alpha = 1
 	as.wg.Add(alpha)
 	var result *Contact = &Contact{}
@@ -201,16 +221,15 @@ func (kademlia *Kademlia) asyncFindNode(target *Contact, as *asyncStruct) {
 			return
 		}
 		var a CloseContacts = kademlia.network.SendFindContactMessage(&c.contact, target.ID)
-		for i := 0; i < len(a); i++ {
-			go kademlia.rt.AddContact(a[i].contact)
-		}
+
 		as.addResult(a)
 	}
 }
 
 func (kademlia *Kademlia) FindNode(target *Contact) CloseContacts {
+	//fmt.Println("FIND THAT MOTHAFUCKA!")
 	var cc CloseContacts = kademlia.rt.FindClosestContacts(target.ID, alpha)
-	var as *asyncStruct = NewAsyncStruct(cc)
+	var as *asyncStruct = kademlia.NewAsyncStruct(cc)
 	as.wg.Add(alpha)
 	for i := 0; i < alpha; i++ {
 		go kademlia.asyncFindNode(target, as)
@@ -225,7 +244,10 @@ func (kademlia *Kademlia) FindNode(target *Contact) CloseContacts {
 			i--
 		}
 	}
-	return result
+	if(len(result) < k){
+		return result
+	}
+	return result[:k]
 }
 
 func (kademlia *Kademlia) asyncLookupData(hash string, as *asyncStruct, resultdata *[]byte) {
@@ -236,13 +258,13 @@ func (kademlia *Kademlia) asyncLookupData(hash string, as *asyncStruct, resultda
 			return
 		}
 		//fmt.Printf("Thread %v - Searching %s\n", num, c)
-		newconts, data := kademlia.network.SendFindDataMessage(&c.contact, &hash)
+		newconts, data := kademlia.network.SendFindDataMessage(&c.contact, hash)
 		if data != nil {
 			fmt.Println("Data is Found!")
-			*resultdata = data
+			resultdata = data
 			as.run = false
 		} else {
-			as.addResult(newconts)
+			as.addResult(*newconts)
 		}
 
 		/* Three different Cases:
@@ -264,7 +286,7 @@ func (kademlia *Kademlia) LookupData(hash string) *[]byte {
 	} else {
 		// Do Search asyncLookupData
 		var cc CloseContacts = kademlia.rt.FindClosestContacts(NewKademliaID(hash), alpha)
-		var as *asyncStruct = NewAsyncStruct(cc)
+		var as *asyncStruct = kademlia.NewAsyncStruct(cc)
 		var resultdata *[]byte
 		kademlia.asyncLookupData(hash, as, resultdata)
 		return resultdata
