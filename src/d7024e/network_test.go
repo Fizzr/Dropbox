@@ -133,21 +133,78 @@ func TestGetResponse(t *testing.T) {
 	go a()
 	response3 := net.getResponse(int64(ID+1))
 	bueno = bueno && response3 == nil
-	fmt.Println(response3)
 	if(bueno){
 		fmt.Println("Success - Network getResponse")
 	}else {
 		t.Fail()
 	}
 }
-
-func TestComunnications2(t *testing.T) {
-	//fmt.Println("222")
+func TestPing(t *testing.T) {
 	var a1, a2 string = "localhost", "localhost"
 	var p1, p2 string = "8003", "8004"
 	var net1, net2 Network
-	kad1 := NewKademlia(a1+":"+p1, &net1, nil)
-	kad2 := NewKademlia(a2+":"+p2, &net2, nil)
+	kad1 := newKademlia(a1+":"+p1, &net1, nil)
+	kad2 := newKademlia(a2+":"+p2, &net2, nil)
+	net1 = NewNetwork(a1, p1, kad1)
+	net2 = NewNetwork(a2, p2, kad2)
+	
+	time.Sleep(1 * time.Second)
+	
+	//Case 1: Test Ping send and response
+	var bueno bool = net1.SendPingMessage(&kad2.rt.me)
+	if bueno {
+		fmt.Println("Success - Network Ping")
+	} else {
+		t.Fail()
+	}
+}
+func TestFindContact(t *testing.T) {
+	var a1, a2 string = "localhost", "localhost"
+	var p1, p2 string = "8005", "8006"
+	var net1, net2 Network
+	kad1 := newKademlia(a1+":"+p1, &net1, nil)
+	kad2 := newKademlia(a2+":"+p2, &net2, nil)
+	net1 = NewNetwork(a1, p1, kad1)
+	net2 = NewNetwork(a2, p2, kad2)
+	
+	time.Sleep(1 * time.Second)
+	
+	//Case 2.1: Test SendFindContactMessage and response
+	var bueno bool = true
+	var target *KademliaID = NewRandomKademliaID()
+	
+	//TODO: Fix reliable way to test single contact lookup. (Sender may or may not have been added to RT before response)
+	/*var cc CloseContacts = net1.SendFindContactMessage(&kad2.rt.me, target)//kad2.rt.me.ID)
+	 
+	bueno = len(cc) == 2
+	if(!bueno) { fmt.Printf("SendFindContactMessage: Expected length 2, found %d\n", len(cc))}
+	bueno = bueno && cc[0].contact.ID.Equals(kad1.rt.me.ID)
+	if(!bueno) { fmt.Printf("SendFindContactMessage: Expected ID %v, found %v\n", kad1.rt.me.ID, cc[0].contact.ID)}
+	bueno = bueno && cc[0].distance.Equals(kad1.rt.me.ID.CalcDistance(kad1.rt.me.ID))
+	if(!bueno) { fmt.Printf("SendFindContactMessage: Expected distance %v, found %v\n",kad1.rt.me.ID.CalcDistance(kad1.rt.me.ID), cc[0].distance)}
+	*/
+		//Case 2.2 Test SendFindContactMessage and response with a lot of returned nodes!
+	for i := 0; i < 40; i ++ {
+		kad2.rt.AddContact(NewContact(NewRandomKademliaID(), fmt.Sprintf("localhost:%d",8050+i)))
+	}
+	var cc2 CloseContacts = net1.SendFindContactMessage(&kad2.rt.me, target)
+
+	bueno = bueno && len(cc2) == k
+	if(!bueno){ fmt.Printf("SendFindContactMessage big: Expected size %d, got %d\n", k, len(cc2)) }
+	if bueno {
+		fmt.Println("Success - Network FindContact")
+	} else {
+		t.Fail()
+	}
+
+}
+/*
+func TestComunnications2(t *testing.T) {
+	var a1, a2 string = "localhost", "localhost"
+	var p1, p2 string = "8003", "8004"
+	var net1, net2 Network
+	kad1 := newKademlia(a1+":"+p1, &net1, nil)
+	kad2 := newKademlia(a2+":"+p2, &net2, nil)
 	net1 = NewNetwork(a1, p1, kad1)
 	net2 = NewNetwork(a2, p2, kad2)
 	
@@ -168,11 +225,11 @@ func TestComunnications2(t *testing.T) {
 	var cc CloseContacts = net1.SendFindContactMessage(&kad2.rt.me, target)
 	
 	bueno = len(cc) == 1
-	if(!bueno) { fmt.Printf("Expected length 1, found %d\n", len(cc))}
+	if(!bueno) { fmt.Printf("SendFindContactMessage: Expected length 1, found %d\n", len(cc))}
 	bueno = bueno && cc[0].contact.ID.Equals(kad2.rt.me.ID)
-	if(!bueno) { fmt.Println("Expected ID %v, found %v\n", kad2.rt.me.ID, cc[0].contact.ID)}
+	if(!bueno) { fmt.Printf("SendFindContactMessage: Expected ID %v, found %v\n", kad2.rt.me.ID, cc[0].contact.ID)}
 	bueno = bueno && cc[0].distance.Equals(kad2.rt.me.ID.CalcDistance(target))
-	if(!bueno) { fmt.Printf("Expected distance %v, found %v\n",kad1.rt.me.ID.CalcDistance(kad2.rt.me.ID), cc[0].distance)}
+	if(!bueno) { fmt.Printf("SendFindContactMessage: Expected distance %v, found %v\n",kad1.rt.me.ID.CalcDistance(kad2.rt.me.ID), cc[0].distance)}
 	
 	//Case 3.1: Test SendFindDataMessage and response with only contacts
 	
@@ -186,11 +243,12 @@ func TestComunnications2(t *testing.T) {
 	}
 	var cc2 CloseContacts = net1.SendFindContactMessage(&kad2.rt.me, target)
 
-	fmt.Println(len(cc2))
-	
+	bueno = bueno && len(cc2) == k
+	if(!bueno){ fmt.Printf("SendFindContactMessage big: Expected size %d, got %d\n", k, len(cc2)) }
 	if bueno {
 		fmt.Println("Success - Network FindContact")
 	} else {
 		t.Fail()
 	}
 }
+*/

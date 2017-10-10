@@ -25,7 +25,6 @@ type Network struct {
 	address string
 	port string
 	kad *Kademlia
-//	me KademliaID
 	mID int64
 	IDLock *sync.Mutex
 	responseList *responses
@@ -134,6 +133,10 @@ func (network *Network) Listen() {
 		var received *messages.Message = &messages.Message{}
 		err = proto.Unmarshal(buff[:n], received)
 		CheckError(err)
+		
+		var sender Contact = NewContact(NewKademliaID(received.Sender.ID), received.Sender.Address)
+		go network.kad.rt.AddContact(sender)
+		
 		if(received.Type == messages.Message_RESPONSE) {
 			//fmt.Println("Listened response")
 			go network.addResponse(*received.Response)
@@ -167,7 +170,7 @@ func (network *Network) newMessage(typ messages.Message_Type) messages.Message{
 	return msg
 }
 
-func (network *Network) newRespondMessage() messages.Message{
+func (network *Network) newResponseMessage() messages.Message{
 	return network.newMessage(messages.Message_RESPONSE)
 }
 
@@ -182,7 +185,7 @@ func (network *Network) respondPingMessage(received messages.Message) {
 	CheckError(err)
 	defer Conn.Close()
 
-	var msg messages.Message = network.newRespondMessage()
+	var msg messages.Message = network.newResponseMessage()
 
 	var ping messages.Response = messages.Response{received.Request.MessageID, messages.Response_PING, nil, nil}
 	msg.Response = &ping
@@ -234,7 +237,7 @@ func (network *Network) SendPingMessage(contact *Contact) bool{
 func (network *Network) respondFindNodeMessage(received messages.Message) {
 	//fmt.Println("respond Find")
 	var cc CloseContacts = network.kad.rt.FindClosestContacts(NewKademliaID(received.Request.ID), k)
-	var msg messages.Message = network.newRespondMessage()
+	var msg messages.Message = network.newResponseMessage()
 	var response messages.Response = messages.Response{}
 	response.Type = messages.Response_FINDNODE
 	for i := 0; i < len(cc); i++ {
@@ -291,7 +294,7 @@ func (network *Network) SendFindContactMessage(contact *Contact, target *Kademli
 }
 
 func (network *Network) respondFindDataMessage(received messages.Message) {
-	var msg messages.Message = newResponseMessage()
+	var msg messages.Message = network.newResponseMessage()
 	var response messages.Response = messages.Response{}
 	response.MessageID = received.Request.MessageID
 	
@@ -310,7 +313,7 @@ func (network *Network) respondFindDataMessage(received messages.Message) {
 			response.Contacts = append(response.Contacts, &cont)
 		}
 	}
-	msg.Response = response
+	msg.Response = &response
 	var buff []byte
 	buff, err := proto.Marshal(&msg)
 	CheckError(err)
