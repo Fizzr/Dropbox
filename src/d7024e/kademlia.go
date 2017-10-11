@@ -305,12 +305,5 @@ func (kademlia *Kademlia) Store(data []byte) {
 	for i := 0; i < len(cc); i++ {
 		kademlia.network.SendStoreMessage(sha)
 	}
-	// Store data in own file (I think?)
-
-	// Do lookup on data handle (I think?)
-
-	// Store data in k closest nodes (I think?)
-
-	// return handle
 
 }
