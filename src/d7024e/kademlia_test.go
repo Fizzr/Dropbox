@@ -68,7 +68,17 @@ func (mn *MockNetwork) SendFindContactMessage(contact *Contact, target *Kademlia
 func (mn *MockNetwork) SendFindDataMessage(contact *Contact, hash string) (*CloseContacts, *[]byte) {
 	return nil, nil
 }
+
+var mapmap map[*KademliaID]*(map[string]*[]byte) = make(map[*KademliaID]*(map[string]*[]byte))
 func (mn *MockNetwork) SendStoreMessage(contact *Contact, hash string, data []byte) {
+	m, ok := mapmap[contact.ID]
+	if(!ok){
+		var newM map[string]*[]byte = make(map[string]*[]byte)
+		mapmap[contact.ID] = &newM
+		newM[hash] = &data
+	} else {
+		(*m)[hash] = &data
+	}
 	return
 }
 
@@ -182,5 +192,37 @@ func testFindNode(look Contact, correct CloseContacts, t *testing.T) {
 	}else {
 		t.Fail()
 	}
+}
 
+func TestStore(t *testing.T) {
+	var mn *MockNetwork = &MockNetwork{"localhost", 8000, nil}
+	var c Contact = NewContact(NewRandomKademliaID(), "localhost:8001")
+	var rt *RoutingTable = NewRoutingTable(c)
+	var kad *Kademlia = &Kademlia{rt, mn, nil}
+	var encrypt string = "apa"
+	var hash string = kad.Store([]byte(encrypt))
+	time.Sleep(time.Second)
+
+	m, ok := mapmap[c.ID]
+	var bueno bool = true
+	if(!ok) {
+		fmt.Println("Store: Couldn't find contact map")
+		bueno = false;
+	} else {
+		data, innerOK := (*m)[hash]
+		if(!innerOK){
+			fmt.Println("Store: Couldn't find data from hash")
+		}else {
+			var good bool = string(*data) == encrypt
+			bueno = bueno && good
+			if(!good) {
+				fmt.Printf("Store: Incorrect data. Expected %s, found %s", encrypt, string(*data))
+			}
+		}
+	}
+	if(bueno) {
+		fmt.Println("Success - Kademlia Store")
+	} else {
+		t.Fail()
+	}
 }

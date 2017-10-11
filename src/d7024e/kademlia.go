@@ -1,7 +1,9 @@
 package d7024e
 
 import (
-	"crypto/sha1"
+	//"crypto/sha1"
+	ripemd160 "golang.org/x/crypto/ripemd160"
+	"encoding/hex"
 	"sync"
 	//	"sync/atomic"
 	"sort"
@@ -295,19 +297,25 @@ func (kademlia *Kademlia) LookupData(hash string) *[]byte {
 	}
 }
 
-func (kademlia *Kademlia) Store(data []byte) {
+func (kademlia *Kademlia) Store(data []byte) string{
 
 	// Hash data to get handle
-	hasher := sha1.New()
+	hasher := ripemd160.New()
 	hasher.Write(data)
-
-	//sData := kademlia.LookupContact(NewKademlia(hasher), true)
+	var hash string = hex.EncodeToString(hasher.Sum(nil))
+	
 	// Store data in own file (I think?)
 
 	// Do lookup on data handle (I think?)
-
+	var look Contact = NewContact(NewKademliaID(hash), "")
+	var cc CloseContacts = kademlia.FindNode(&look)
+	
 	// Store data in k closest nodes (I think?)
 
+	for i := 0; i < len(cc) && i < alpha; i ++ {
+		go kademlia.network.SendStoreMessage(&cc[i].contact, hash, data)
+	}
 	// return handle
-
+	return hash
+	
 }
