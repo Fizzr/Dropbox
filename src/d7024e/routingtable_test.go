@@ -286,12 +286,3 @@ func TestEquals(t *testing.T){
 		fmt.Println("Success - KademliaID Equals")
 	}
 }
-
-// Test Function to check Distance between 2 Nodes.
-func TestDistFunc(t *testing.T) {
-
-	DistT1 := NewKademliaID(testList[0])
-	DistT2 := NewKademliaID(testList[5])
-	DistBetween := DistT2.CalcDistance(DistT1)
-	fmt.Printf("%v\n",DistBetween)
-}

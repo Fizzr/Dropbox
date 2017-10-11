@@ -68,7 +68,7 @@ func TestProtobufNetwork(t *testing.T) {
 	sender.Address = "localhost:8002"
 	a.Sender = sender
 	a.Type = 0
-	aInner := &messages.Request{0,1, "4321"}
+	aInner := &messages.Request{0,1, "4321", nil}
 	a.Request = aInner
 
 	p, _ := proto.Marshal(&a)
@@ -196,8 +196,79 @@ func TestFindContact(t *testing.T) {
 	} else {
 		t.Fail()
 	}
-
 }
+func TestSendFindDataMessage(t *testing.T) {
+	var a1, a2 string = "localhost", "localhost"
+	var p1, p2 string = "8007", "8008"
+	var net1, net2 Network
+	kad1 := newKademlia(a1+":"+p1, &net1, nil)
+	kad2 := newKademlia(a2+":"+p2, &net2, nil)
+	net1 = NewNetwork(a1, p1, kad1)
+	net2 = NewNetwork(a2, p2, kad2)
+	
+	time.Sleep(1 * time.Second)
+	var find []byte = []byte("This is some information")
+	kad2.data["1230000000000000000000000000000000000000"] = &find
+	r1, r2 := net1.SendFindDataMessage(&kad2.rt.me, "0000000000000000000000000000000000000123") //won't find
+	
+	if (r1 == nil || r2 != nil){
+		fmt.Printf("FindData: Found %v and %v, expected not nil and nil\n", r1, r2)
+		t.Fail()
+	}
+	r1, r2 = net1.SendFindDataMessage(&kad2.rt.me, "1230000000000000000000000000000000000000") //will find
+	if(r1 != nil || r2 == nil) {
+		fmt.Printf("FindData: Found %v and %v, expected nil and not nil\n", r1, r2)
+		t.Fail()
+	}
+	var bueno bool = true
+	for i:= 0; i < len(*r2); i++ {
+		var good bool = (*r2)[i] == find[i]
+		if(!good) {fmt.Printf("FindData: Wrong byte at %d. Expeced %v, found %v\n", i, find[i], (*r2)[i])}
+		bueno = bueno && good
+	}
+	if(bueno) {
+		fmt.Println("Success - Network FindData")
+	}else {
+		fmt.Printf("FindData: Expected %v, found %v\n", find, *r2);
+		t.Fail();
+	}
+}
+
+func TestStoreMessage(t *testing.T) {
+	var a1, a2 string = "localhost", "localhost"
+	var p1, p2 string = "8009", "8010"
+	var net1, net2 Network
+	kad1 := newKademlia(a1+":"+p1, &net1, nil)
+	kad2 := newKademlia(a2+":"+p2, &net2, nil)
+	net1 = NewNetwork(a1, p1, kad1)
+	net2 = NewNetwork(a2, p2, kad2)
+	time.Sleep(1 * time.Second)
+
+	var store []byte = []byte("information")
+	net1.SendStoreMessage(&kad2.rt.me, "bebe", store)
+	
+	time.Sleep(1 * time.Second)
+	
+	inf, ok := kad2.data["bebe"]
+	if(!ok) {
+		fmt.Println("Store Message: Didn't find stored data!")
+		t.Fail()
+	}else {
+		var bueno bool = true
+		for i := 0; i < len(*inf); i ++ {
+			var good bool = (*inf)[i] == store[i]
+			if(!good) {fmt.Printf("Store Message: Wrong byte at %d. Expected %v, found %v\n",i, store[i], (*inf)[i])}
+			bueno = bueno && good
+		}
+		if(bueno){
+			fmt.Println("Success - Network SendStoreMessage")
+		}else {
+			t.Fail()
+		}
+	}
+	
+}
+
 /*
 func TestComunnications2(t *testing.T) {
 	var a1, a2 string = "localhost", "localhost"

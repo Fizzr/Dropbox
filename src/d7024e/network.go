@@ -18,7 +18,7 @@ type Net interface {
 	SendPingMessage(contact *Contact) bool
 	SendFindContactMessage(contact *Contact, target *KademliaID) CloseContacts
 	SendFindDataMessage(contact *Contact, hash string) (*CloseContacts, *[]byte)
-	SendStoreMessage(contact *Contact, data []byte)
+	SendStoreMessage(contact *Contact, hash string, data []byte)
 }
 
 type Network struct {
@@ -150,8 +150,10 @@ func (network *Network) Listen() {
 					go network.respondFindNodeMessage(*received)					
 					break
 				case messages.Request_FINDDATA:
+					go network.respondFindDataMessage(*received)
 					break
 				case messages.Request_STORE: 
+					go network.respondStoreMessage(*received)
 					break
 				default:
 					fmt.Println("Error: Unknown request type")
@@ -211,7 +213,7 @@ func (network *Network) SendPingMessage(contact *Contact) bool{
 	defer Conn.Close()
 	var msg messages.Message = network.newRequestMessage()
 	var mID int64 = network.getMessageID()
-	var ping messages.Request = messages.Request{mID, messages.Request_PING, ""}
+	var ping messages.Request = messages.Request{mID, messages.Request_PING, "", nil}
 	msg.Request = &ping
 	
 	var buff []byte
@@ -270,7 +272,7 @@ func (network *Network) SendFindContactMessage(contact *Contact, target *Kademli
 
 	var msg messages.Message = network.newRequestMessage()
 	var mID int64 = network.getMessageID()
-	msg.Request = &messages.Request{mID, messages.Request_FINDNODE, fmt.Sprint(target)}
+	msg.Request = &messages.Request{mID, messages.Request_FINDNODE, fmt.Sprint(target), nil}
 	
 	var buff []byte
 	buff, err = proto.Marshal(&msg)
@@ -299,11 +301,13 @@ func (network *Network) respondFindDataMessage(received messages.Message) {
 	response.MessageID = received.Request.MessageID
 	
 	//FIND DATA IN FILE 
-	var data []byte
+	var data *[]byte
 	var dataFound bool = false
 	
+	data, dataFound = network.kad.data[received.Request.ID] 
+	
 	if(dataFound) {
-		response.Data = data
+		response.Data = *data
 		response.Type = messages.Response_FINDDATA_FOUND
 	} else {
 		response.Type = messages.Response_FINDDATA_NODES
@@ -338,7 +342,7 @@ func (network *Network) SendFindDataMessage(contact *Contact, hash string) (*Clo
 
 	var msg messages.Message = network.newRequestMessage()
 	var mID int64 = network.getMessageID()
-	msg.Request = &messages.Request{mID, messages.Request_FINDDATA, hash}
+	msg.Request = &messages.Request{mID, messages.Request_FINDDATA, hash, nil}
 	
 	var buff []byte
 	buff, err = proto.Marshal(&msg)
@@ -367,6 +371,24 @@ func (network *Network) SendFindDataMessage(contact *Contact, hash string) (*Clo
 	}
 }
 
-func (network *Network) SendStoreMessage(contact *Contact, data []byte) {
-	// TODO
+func (network *Network) respondStoreMessage(received messages.Message) {
+	network.kad.data[received.Request.ID] = &received.Request.Data
+}
+
+func (network *Network) SendStoreMessage(contact *Contact, hash string, data []byte) {
+	ServerAddr, err := net.ResolveUDPAddr("udp", contact.Address)
+	CheckError(err)	
+	Conn, err := net.DialUDP("udp", nil, ServerAddr)
+	CheckError(err)
+	defer Conn.Close()
+
+	var msg messages.Message = network.newRequestMessage()
+	var mID int64 = network.getMessageID()
+	msg.Request = &messages.Request{mID, messages.Request_STORE, hash, data}
+
+	var buff []byte
+	buff, err = proto.Marshal(&msg)
+	CheckError(err)
+	_, err = Conn.Write(buff)
+	CheckError(err)
 }
