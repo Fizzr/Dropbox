@@ -282,11 +282,12 @@ func TestRepublish(t *testing.T) {
 
 func TestFindData(t *testing.T) {
 	var kad *Kademlia
-	var mn *MockNetwork = &MockNetwork{"localhost", 8000, nil, kad}
+	var mn *MockNetwork = &MockNetwork{"localhost", 8000, nil}
 	var base Contact = randRTs[29].me
 	var c Contact = NewContact(NewRandomKademliaID(), "localhost:8001")
 	var rt *RoutingTable = NewRoutingTable(c)
-	kad = &Kademlia{rt, mn, nil} // Send Data In Here?
+	var dat map[string]*dataStruct = make(map[string]*dataStruct)
+	kad = &Kademlia{rt, mn, &dat, nil} // Send Data In Here?
 	rt.AddContact(base)
 
 	var data string = "9cfef18a4799c191f79c9995dc2d7b9a49fcd213"

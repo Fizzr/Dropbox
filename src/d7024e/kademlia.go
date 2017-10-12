@@ -9,6 +9,7 @@ import (
 	//	"sync/atomic"
 	"fmt"
 	"time"
+	"sort"
 )
 
 const k = 20
@@ -304,7 +305,7 @@ func (kademlia *Kademlia) asyncLookupData(hash string, as *asyncStruct, resultda
 			*resultdata = *data
 			//fmt.Println(resultdata)
 			as.run = false
-		} else {
+		} else if(newconts != nil) {
 			as.addResult(*newconts)
 		}
 
