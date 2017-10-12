@@ -301,13 +301,13 @@ func (network *Network) respondFindDataMessage(received messages.Message) {
 	response.MessageID = received.Request.MessageID
 	
 	//FIND DATA IN FILE 
-	var data *[]byte
+	var data *dataStruct
 	var dataFound bool = false
 	
-	data, dataFound = network.kad.data[received.Request.ID] 
+	data, dataFound = (*network.kad.data)[received.Request.ID] 
 	
 	if(dataFound) {
-		response.Data = *data
+		response.Data = *data.data
 		response.Type = messages.Response_FINDDATA_FOUND
 	} else {
 		response.Type = messages.Response_FINDDATA_NODES
@@ -372,7 +372,7 @@ func (network *Network) SendFindDataMessage(contact *Contact, hash string) (*Clo
 }
 
 func (network *Network) respondStoreMessage(received messages.Message) {
-	network.kad.data[received.Request.ID] = &received.Request.Data
+	(*network.kad.data)[received.Request.ID] = &dataStruct{&received.Request.Data, time.Now()}
 }
 
 func (network *Network) SendStoreMessage(contact *Contact, hash string, data []byte) {

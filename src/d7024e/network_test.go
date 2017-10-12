@@ -208,7 +208,7 @@ func TestSendFindDataMessage(t *testing.T) {
 	
 	time.Sleep(1 * time.Second)
 	var find []byte = []byte("This is some information")
-	kad2.data["1230000000000000000000000000000000000000"] = &find
+	(*kad2.data)["1230000000000000000000000000000000000000"] = &dataStruct{&find, time.Now()}
 	r1, r2 := net1.SendFindDataMessage(&kad2.rt.me, "0000000000000000000000000000000000000123") //won't find
 	
 	if (r1 == nil || r2 != nil){
@@ -249,15 +249,15 @@ func TestStoreMessage(t *testing.T) {
 	
 	time.Sleep(1 * time.Second)
 	
-	inf, ok := kad2.data["bebe"]
+	inf, ok := (*kad2.data)["bebe"]
 	if(!ok) {
 		fmt.Println("Store Message: Didn't find stored data!")
 		t.Fail()
 	}else {
 		var bueno bool = true
-		for i := 0; i < len(*inf); i ++ {
-			var good bool = (*inf)[i] == store[i]
-			if(!good) {fmt.Printf("Store Message: Wrong byte at %d. Expected %v, found %v\n",i, store[i], (*inf)[i])}
+		for i := 0; i < len(*inf.data); i ++ {
+			var good bool = (*inf.data)[i] == store[i]
+			if(!good) {fmt.Printf("Store Message: Wrong byte at %d. Expected %v, found %v\n",i, store[i], (*inf.data)[i])}
 			bueno = bueno && good
 		}
 		if(bueno){

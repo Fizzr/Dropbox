@@ -8,15 +8,22 @@ import (
 	//	"sync/atomic"
 	"sort"
 	"fmt"
+	"time"
 )
 
 const k = 20
 const alpha = 3
 
+type dataStruct struct {
+	data	*[]byte
+	time	time.Time
+}
+
 type Kademlia struct {
 	rt      *RoutingTable
 	network Net
-	data    map[string]*[]byte
+	data    *map[string]*dataStruct
+	myData	*map[string]*dataStruct
 }
 
 type asyncStruct struct {
@@ -34,10 +41,11 @@ func NewKademlia(address string, port string, base *Contact) *Kademlia {
 	var c Contact = NewContact(NewRandomKademliaID(), address+":"+port)
 	var rt *RoutingTable = NewRoutingTable(c)
 	var net Network
-	var data map[string]*[]byte = make(map[string]*[]byte)
-	var k *Kademlia = &Kademlia{rt, &net, data}
+	var data map[string]*dataStruct = make(map[string]*dataStruct)
+	var myData map[string]*dataStruct = make(map[string]*dataStruct)
+	var k *Kademlia = &Kademlia{rt, &net, &data, &myData}
 	net = NewNetwork(address, port, k)
-	
+	go k.dataChecker()
 	if base != nil {
 		k.rt.AddContact(*base)
 		k.FindNode(&c)
@@ -52,14 +60,42 @@ func newKademlia(address string, network Net, base *Contact) *Kademlia{
 		network.(*MockNetwork).me = &c
 	}
 	var rt *RoutingTable = NewRoutingTable(c)
-	var data map[string]*[]byte = make(map[string]*[]byte)
-	var k *Kademlia = &Kademlia{rt, network, data}
+	var data map[string]*dataStruct = make(map[string]*dataStruct)
+	var myData map[string]*dataStruct = make(map[string]*dataStruct)
+	var k *Kademlia = &Kademlia{rt, network, &data, &myData}
 	if base != nil {
 //		fmt.Println("a")
 		k.rt.AddContact(*base)
 		k.FindNode(&c)
 	}
 	return k
+}
+var wakeupRate time.Duration = 1 * time.Minute
+var timeToLive time.Duration = 2 * time.Minute
+
+//Check if data needs to be deleted or retransmitted
+func (kad *Kademlia) dataChecker() {
+	for {
+		for k, v := range *kad.data {
+			if time.Since(v.time) >= timeToLive {
+				delete(*kad.data, k)
+			}
+		}
+		for k, v := range *kad.myData {
+			if time.Since(v.time) >= (timeToLive){//- 1*time.Minute ){	//Send new before they delete!
+				var look Contact = NewContact(NewKademliaID(k), "")
+				var cc CloseContacts = kad.FindNode(&look)
+
+				// Store data in k closest nodes (I think?)
+
+				for i := 0; i < len(cc) && i < alpha; i ++ {
+					go kad.network.SendStoreMessage(&cc[i].contact, k, *v.data)
+				}
+				(*kad.myData)[k] = &dataStruct{v.data, time.Now()}
+			}
+		}
+		time.Sleep(wakeupRate)
+	}
 }
 
 func (kad *Kademlia) NewAsyncStruct(base CloseContacts) *asyncStruct{
@@ -284,9 +320,9 @@ func (kademlia *Kademlia) LookupData(hash string) *[]byte {
 			fmt.Println("Key:", key, "Value:", value)
 		}*/
 
-	if val, ok := kademlia.data[hash]; ok {
+	if val, ok := (*kademlia.data)[hash]; ok {
 		fmt.Printf("Value is:", val)
-		return val
+		return val.data
 	} else {
 		// Do Search asyncLookupData
 		var cc CloseContacts = kademlia.rt.FindClosestContacts(NewKademliaID(hash), alpha)
@@ -303,7 +339,7 @@ func (kademlia *Kademlia) Store(data []byte) string{
 	hasher := ripemd160.New()
 	hasher.Write(data)
 	var hash string = hex.EncodeToString(hasher.Sum(nil))
-	
+	(*kademlia.myData)[hash] = &dataStruct{&data, time.Now()}
 	// Store data in own file (I think?)
 
 	// Do lookup on data handle (I think?)
@@ -317,5 +353,4 @@ func (kademlia *Kademlia) Store(data []byte) string{
 	}
 	// return handle
 	return hash
-	
 }

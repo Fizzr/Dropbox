@@ -145,7 +145,7 @@ func testLookupContact(t *testing.T) {
 	//Don't want to run the bootstrap in test
 	var c Contact = NewContact(NewRandomKademliaID(), "localhost:8001")
 	var rt *RoutingTable = NewRoutingTable(c)
-	var kad *Kademlia = &Kademlia{rt, mn, nil}
+	var kad *Kademlia = &Kademlia{rt, mn, nil, nil}
 	rt.AddContact(base)
 	var look Contact = randRTs[22].me
 	var ret *Contact = kad.LookupContact(&look)
@@ -173,7 +173,7 @@ func testFindNode(look Contact, correct CloseContacts, t *testing.T) {
 	//Don't want to run the bootstrap in test
 	var c Contact = NewContact(NewRandomKademliaID(), "localhost:8001")
 	var rt *RoutingTable = NewRoutingTable(c)
-	var kad *Kademlia = &Kademlia{rt, mn, nil}
+	var kad *Kademlia = &Kademlia{rt, mn, nil, nil}
 	rt.AddContact(base)
 	//var kad *Kademlia = NewKademlia("localhost:8001", mn, &base)	var look Contact = randRTs[10].me
 	var cc CloseContacts = kad.FindNode(&look)
@@ -198,7 +198,8 @@ func TestStore(t *testing.T) {
 	var mn *MockNetwork = &MockNetwork{"localhost", 8000, nil}
 	var c Contact = NewContact(NewRandomKademliaID(), "localhost:8001")
 	var rt *RoutingTable = NewRoutingTable(c)
-	var kad *Kademlia = &Kademlia{rt, mn, nil}
+	var myD map[string]*dataStruct = make(map[string]*dataStruct)
+	var kad *Kademlia = &Kademlia{rt, mn, nil, &myD}
 	var encrypt string = "apa"
 	var hash string = kad.Store([]byte(encrypt))
 	time.Sleep(time.Second)
@@ -222,6 +223,57 @@ func TestStore(t *testing.T) {
 	}
 	if(bueno) {
 		fmt.Println("Success - Kademlia Store")
+	} else {
+		t.Fail()
+	}
+}
+
+func TestRepublish(t *testing.T) {
+	wakeupRate = 1 * time.Second
+	defer func (){wakeupRate = 1 * time.Minute; timeToLive = 2*time.Minute}()
+	var k *Kademlia = NewKademlia("localhost", "8111", nil)
+	var encrypt string = "tester"
+	var saved []byte = []byte(encrypt)
+	var hash string = k.Store(saved)
+	var bueno bool = true
+	time.Sleep(500*time.Millisecond)
+	
+	ds, ok := (*k.data)[hash]
+	bueno = bueno && ok
+	if(!ok) {
+		fmt.Println("Republish: Data not stored!")
+	} else {
+		for i:= 0; i < len(*ds.data); i ++ {
+			var good bool = (*ds.data)[i] == saved[i]
+			if(!good){fmt.Printf("Replicate: Wrong byte at %d. Expected %v, found %v\n", i, saved[i], (*ds.data)[i])}
+			bueno = bueno && good
+		}
+	}
+	(*k.myData)[hash] = &dataStruct{&saved, time.Now().Add(time.Minute)}
+	timeToLive = 1 * time.Second
+	time.Sleep(2 * time.Second)
+	
+	_, ok2 := (*k.data)[hash]
+	if(ok2){
+		fmt.Println("Republish: Data not deleted")
+	}
+	bueno = bueno && !ok2
+	(*k.myData)[hash] = &dataStruct{&saved, time.Now().Add(-1*time.Minute)}
+	time.Sleep(1*time.Second + 500 * time.Millisecond)
+	
+	ds3, ok3 := (*k.data)[hash]
+	bueno = bueno && ok3
+	if(!ok3) {
+		fmt.Println("Republish: Data not republished!")
+	} else {
+		for i:= 0; i < len(*ds3.data); i ++ {
+			var good bool = (*ds3.data)[i] == saved[i]
+			if(!good){fmt.Printf("Replicate: Wrong byte at %d. Expected %v, found %v\n", i, saved[i], (*ds3.data)[i])}
+			bueno = bueno && good
+		}
+	}
+	if(bueno){
+		fmt.Println("Success - Kademlia Republish & Delete")
 	} else {
 		t.Fail()
 	}
