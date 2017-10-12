@@ -2,9 +2,10 @@ package d7024e
 
 import (
 	//"crypto/sha1"
-	ripemd160 "golang.org/x/crypto/ripemd160"
 	"encoding/hex"
 	"sync"
+
+	ripemd160 "golang.org/x/crypto/ripemd160"
 	//	"sync/atomic"
 	"fmt"
 	"sort"
@@ -48,12 +49,13 @@ func NewKademlia(address string, port string, base *Contact) *Kademlia {
 func newKademlia(address string, network Net, base *Contact) *Kademlia {
 	var c Contact = NewContact(NewRandomKademliaID(), address)
 	//fmt.Printf("%T", network)
-	if fmt.Sprintf("%T", network) == "*d7024e.MockNetwork" {
-		network.(*MockNetwork).me = &c
-	}
+	//if fmt.Sprintf("%T", network) == "*d7024e.MockNetwork" {
+	//network.(*MockNetwork).me = &c
+	//}
 	var rt *RoutingTable = NewRoutingTable(c)
 	var data map[string]*[]byte = make(map[string]*[]byte)
 	var k *Kademlia = &Kademlia{rt, network, data}
+
 	if base != nil {
 		//		fmt.Println("a")
 		k.rt.AddContact(*base)
@@ -259,10 +261,13 @@ func (kademlia *Kademlia) asyncLookupData(hash string, as *asyncStruct, resultda
 			return
 		}
 		//fmt.Printf("Thread %v - Searching %s\n", num, c)
+		var data *[]byte
 		newconts, data := kademlia.network.SendFindDataMessage(&c.contact, hash)
 		if data != nil {
-			fmt.Println("Data is Found!")
-			resultdata = data
+			//fmt.Println("Data is Found!")
+			//fmt.Println(data)
+			*resultdata = *data
+			//fmt.Println(resultdata)
 			as.run = false
 		} else {
 			as.addResult(*newconts)
@@ -273,7 +278,9 @@ func (kademlia *Kademlia) asyncLookupData(hash string, as *asyncStruct, resultda
 		closeco, nil
 		nil, nil
 		*/
+
 	}
+
 }
 
 func (kademlia *Kademlia) LookupData(hash string) *[]byte {
@@ -288,31 +295,37 @@ func (kademlia *Kademlia) LookupData(hash string) *[]byte {
 		// Do Search asyncLookupData
 		var cc CloseContacts = kademlia.rt.FindClosestContacts(NewKademliaID(hash), alpha)
 		var as *asyncStruct = kademlia.NewAsyncStruct(cc)
-		var resultdata *[]byte
-		kademlia.asyncLookupData(hash, as, resultdata)
-		return resultdata
+		var resultdata1 []byte = []byte("")
+		as.wg.Add(alpha)
+		for i := 0; i < len(cc) && i < alpha; i++ {
+			go kademlia.asyncLookupData(hash, as, &resultdata1)
+		}
+
+		//as.wg.Wait()
+		//fmt.Println(resultdata1)
+		return &resultdata1
 	}
 }
 
-func (kademlia *Kademlia) Store(data []byte) string{
+func (kademlia *Kademlia) Store(data []byte) string {
 
 	// Hash data to get handle
 	hasher := ripemd160.New()
 	hasher.Write(data)
 	var hash string = hex.EncodeToString(hasher.Sum(nil))
-	
+
 	// Store data in own file (I think?)
 
 	// Do lookup on data handle (I think?)
 	var look Contact = NewContact(NewKademliaID(hash), "")
 	var cc CloseContacts = kademlia.FindNode(&look)
-	
+
 	// Store data in k closest nodes (I think?)
 
-	for i := 0; i < len(cc) && i < alpha; i ++ {
+	for i := 0; i < len(cc) && i < alpha; i++ {
 		go kademlia.network.SendStoreMessage(&cc[i].contact, hash, data)
 	}
 	// return handle
 	return hash
-	
+
 }

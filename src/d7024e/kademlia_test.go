@@ -14,6 +14,7 @@ type MockNetwork struct {
 	ip   string
 	port int
 	me   *Contact
+	kad  *Kademlia
 }
 
 var lookList []string = []string{
@@ -57,9 +58,9 @@ func (mn *MockNetwork) SendFindContactMessage(contact *Contact, target *Kademlia
 		if randRTs[i].me.ID.Equals(contact.ID) {
 			//fmt.Println("yeh boi")
 			cc := randRTs[i].FindClosestContacts(target, k)
-			if mn.me != nil {
+			if mn.kad != nil {
 				//fmt.Println("lal")
-				randRTs[i].AddContact(*mn.me)
+				randRTs[i].AddContact(mn.kad.rt.me)
 			}
 			return cc
 		}
@@ -69,16 +70,18 @@ func (mn *MockNetwork) SendFindContactMessage(contact *Contact, target *Kademlia
 func (mn *MockNetwork) SendFindDataMessage(contact *Contact, hash string) (*CloseContacts, *[]byte) {
 	if hash == "9cfef18a4799c191f79c9995dc2d7b9a49fcd213" {
 		//returnByteData = []byte(hash)
-		var returnDataString string = "apa"
-		return nil, returnDataString
+		var derp []byte
+		derp = []byte("apa")
+		return nil, &derp
 	}
 	return nil, nil
 }
 
 var mapmap map[*KademliaID]*(map[string]*[]byte) = make(map[*KademliaID]*(map[string]*[]byte))
+
 func (mn *MockNetwork) SendStoreMessage(contact *Contact, hash string, data []byte) {
 	m, ok := mapmap[contact.ID]
-	if(!ok){
+	if !ok {
 		var newM map[string]*[]byte = make(map[string]*[]byte)
 		mapmap[contact.ID] = &newM
 		newM[hash] = &data
@@ -104,10 +107,13 @@ func TestBootstrap(t *testing.T) {
 	var base *Kademlia
 	var q, port int = 100, 8001
 	randRTs = make([]RoutingTable, 0, q)
-	base = newKademlia("localhost:8000", &MockNetwork{"localhost", 8000, nil}, nil)
+	var mn *MockNetwork = &MockNetwork{"localhost", 8000, nil, base}
+	base = newKademlia("localhost:8000", mn, nil)
 	randRTs = append(randRTs, *base.rt)
 	for i := 1; i < q; i++ {
-		var tmp *Kademlia = newKademlia(fmt.Sprintf("localhost:%d", port), &MockNetwork{"localhost", port, nil}, &base.rt.me)
+		var tmp *Kademlia
+		var tmpMN *MockNetwork = &MockNetwork{"localhost", port, nil, tmp}
+		tmp = newKademlia(fmt.Sprintf("localhost:%d", port), tmpMN, &base.rt.me)
 		port++
 		base = tmp
 		randRTs = append(randRTs, *base.rt)
@@ -145,12 +151,13 @@ func TestKademlia(t *testing.T) {
 }
 
 func testLookupContact(t *testing.T) {
-	var mn *MockNetwork = &MockNetwork{"localhost", 8000, nil}
+	var kad *Kademlia
+	var mn *MockNetwork = &MockNetwork{"localhost", 8000, nil, kad}
 	var base Contact = randRTs[34].me
 	//Don't want to run the bootstrap in test
 	var c Contact = NewContact(NewRandomKademliaID(), "localhost:8001")
 	var rt *RoutingTable = NewRoutingTable(c)
-	var kad *Kademlia = &Kademlia{rt, mn, nil}
+	kad = &Kademlia{rt, mn, nil}
 	rt.AddContact(base)
 	var look Contact = randRTs[22].me
 	var ret *Contact = kad.LookupContact(&look)
@@ -176,40 +183,53 @@ func testLookupContact(t *testing.T) {
 	}
 }
 
-func testFindData(t *testing.T) {
-	var mn *MockNetwork = &MockNetowrk{"localhost", 8000, nil}
+func TestFindData(t *testing.T) {
+	var kad *Kademlia
+	var mn *MockNetwork = &MockNetwork{"localhost", 8000, nil, kad}
 	var base Contact = randRTs[29].me
 	var c Contact = NewContact(NewRandomKademliaID(), "localhost:8001")
 	var rt *RoutingTable = NewRoutingTable(c)
-	var kad *Kademlia = &Kademlia{rt, mn, nil} // Send Data In Here?
+	kad = &Kademlia{rt, mn, nil} // Send Data In Here?
 	rt.AddContact(base)
 
 	var data string = "9cfef18a4799c191f79c9995dc2d7b9a49fcd213"
 	var ret = kad.LookupData(data)
 
-	var bueno bool
-	bueno = ret.Equals([]byte("apa"))
+	var bueno bool = true
+	if ret == nil {
+		bueno = false
+		fmt.Println("First False")
+	} else {
+		for i := 0; i < len(*ret); i++ {
+			if (*ret)[i] == []byte("apa")[i] {
+				bueno = bueno && true
+			} else {
+				bueno = false
+				fmt.Println("Second False")
+			}
+		}
+	}
 
 	if !bueno {
-		fmt.Printf("LookupData: Wrong DataID. \n%v Expected\n%v found\n", data, ret)
+		fmt.Printf("LookupData: Wrong DataID. \n%v Expected\n%v found\n", []byte("apa"), ret)
 	}
 
 	if bueno {
-		fmt.Println("Sucess - Kademlia LookupData")
+		fmt.Println("Success - Kademlia LookupData")
 	} else {
 		t.Fail()
 	}
-
 }
 
 func testFindNode(look Contact, correct CloseContacts, t *testing.T) {
-	var mn *MockNetwork = &MockNetwork{"localhost", 8000, nil}
+	var kad *Kademlia
+	var mn *MockNetwork = &MockNetwork{"localhost", 8000, nil, kad}
 	var base Contact = randRTs[29].me
 	//Don't want to run the bootstrap in test
 	var c Contact = NewContact(NewRandomKademliaID(), "localhost:8001")
 	var rt *RoutingTable = NewRoutingTable(c)
-	var kad *Kademlia = &Kademlia{rt, mn, nil}
 	rt.AddContact(base)
+	kad = &Kademlia{rt, mn, nil}
 	//var kad *Kademlia = NewKademlia("localhost:8001", mn, &base)	var look Contact = randRTs[10].me
 	var cc CloseContacts = kad.FindNode(&look)
 	var bueno bool
@@ -234,32 +254,33 @@ func testFindNode(look Contact, correct CloseContacts, t *testing.T) {
 }
 
 func TestStore(t *testing.T) {
-	var mn *MockNetwork = &MockNetwork{"localhost", 8000, nil}
+	var kad *Kademlia
+	var mn *MockNetwork = &MockNetwork{"localhost", 8000, nil, kad}
 	var c Contact = NewContact(NewRandomKademliaID(), "localhost:8001")
 	var rt *RoutingTable = NewRoutingTable(c)
-	var kad *Kademlia = &Kademlia{rt, mn, nil}
+	kad = &Kademlia{rt, mn, nil}
 	var encrypt string = "apa"
 	var hash string = kad.Store([]byte(encrypt))
 	time.Sleep(time.Second)
 
 	m, ok := mapmap[c.ID]
 	var bueno bool = true
-	if(!ok) {
+	if !ok {
 		fmt.Println("Store: Couldn't find contact map")
-		bueno = false;
+		bueno = false
 	} else {
 		data, innerOK := (*m)[hash]
-		if(!innerOK){
+		if !innerOK {
 			fmt.Println("Store: Couldn't find data from hash")
-		}else {
+		} else {
 			var good bool = string(*data) == encrypt
 			bueno = bueno && good
-			if(!good) {
+			if !good {
 				fmt.Printf("Store: Incorrect data. Expected %s, found %s", encrypt, string(*data))
 			}
 		}
 	}
-	if(bueno) {
+	if bueno {
 		fmt.Println("Success - Kademlia Store")
 	} else {
 		t.Fail()
