@@ -278,3 +278,42 @@ func TestRepublish(t *testing.T) {
 		t.Fail()
 	}
 }
+
+
+func TestFindData(t *testing.T) {
+	var kad *Kademlia
+	var mn *MockNetwork = &MockNetwork{"localhost", 8000, nil, kad}
+	var base Contact = randRTs[29].me
+	var c Contact = NewContact(NewRandomKademliaID(), "localhost:8001")
+	var rt *RoutingTable = NewRoutingTable(c)
+	kad = &Kademlia{rt, mn, nil} // Send Data In Here?
+	rt.AddContact(base)
+
+	var data string = "9cfef18a4799c191f79c9995dc2d7b9a49fcd213"
+	var ret = kad.LookupData(data)
+
+	var bueno bool = true
+	if ret == nil {
+		bueno = false
+		fmt.Println("First False")
+	} else {
+		for i := 0; i < len(*ret); i++ {
+			if (*ret)[i] == []byte("apa")[i] {
+				bueno = bueno && true
+			} else {
+				bueno = false
+				fmt.Println("Second False")
+			}
+		}
+	}
+
+	if !bueno {
+		fmt.Printf("LookupData: Wrong DataID. \n%v Expected\n%v found\n", []byte("apa"), ret)
+	}
+
+	if bueno {
+		fmt.Println("Success - Kademlia LookupData")
+	} else {
+		t.Fail()
+	}
+}

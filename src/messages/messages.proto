@@ -31,6 +31,8 @@ message request
 		FINDNODE	= 1;
 		FINDDATA	= 2;
 		STORE		= 3;
+		PIN			= 4;
+		UNPIN		= 5;
 		
 	}
 	int64 messageID = 1;	//messageID put here so that the surrounding Message container can be removed when storing.
