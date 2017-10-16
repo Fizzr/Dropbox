@@ -75,6 +75,10 @@ func newKademlia(address string, network Net, base *Contact) *Kademlia {
 var wakeupRate time.Duration = 1 * time.Minute
 var timeToLive time.Duration = 2 * time.Minute
 
+func (kad *Kademlia) Me() *Contact{
+	return &kad.rt.me
+}
+
 //Check if data needs to be deleted or retransmitted
 func (kad *Kademlia) dataChecker() {
 	for {
@@ -324,8 +328,12 @@ func (kademlia *Kademlia) LookupData(hash string) *[]byte {
 		for key, value := range kademlia.data {
 			fmt.Println("Key:", key, "Value:", value)
 		}*/
+	if myVal, myOk := (*kademlia.myData)[hash]; myOk{
+		return myVal.data
+	}
+		
 	if val, ok := (*kademlia.data)[hash]; ok {
-		fmt.Printf("Value is:", val)
+		//fmt.Printf("Value is:", val)
 		return val.data
 	} else {
 		// Do Search asyncLookupData
@@ -347,21 +355,26 @@ func (kademlia *Kademlia) Store(data []byte) string {
 
 	// Hash data to get handle
 	hasher := ripemd160.New()
+	fmt.Println("a")
 	hasher.Write(data)
 	var hash string = hex.EncodeToString(hasher.Sum(nil))
+	fmt.Println("b")
 	(*kademlia.myData)[hash] = &dataStruct{&data, time.Now()}
+	fmt.Println("c")
 
 	// Store data in own file (I think?)
 
 	// Do lookup on data handle (I think?)
 	var look Contact = NewContact(NewKademliaID(hash), "")
 	var cc CloseContacts = kademlia.FindNode(&look)
+	fmt.Println("c")
 
 	// Store data in k closest nodes (I think?)
 
 	for i := 0; i < len(cc) && i < alpha; i++ {
 		go kademlia.network.SendStoreMessage(&cc[i].contact, hash, data)
 	}
+	fmt.Println("d")
 	// return handle
 	return hash
 }

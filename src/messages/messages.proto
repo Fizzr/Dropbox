@@ -31,8 +31,11 @@ message request
 		FINDNODE	= 1;
 		FINDDATA	= 2;
 		STORE		= 3;
-		PIN			= 4;
-		UNPIN		= 5;
+		CLIENT_PIN	= 4;
+		CLIENT_UNPIN	= 5;
+		CLIENT_STORE	= 6;
+		CLIENT_LOCAL	= 7;
+		CLIENT_LOOKUP	= 8;
 		
 	}
 	int64 messageID = 1;	//messageID put here so that the surrounding Message container can be removed when storing.
@@ -49,7 +52,7 @@ message response
 		FINDNODE = 1;
 		FINDDATA_FOUND = 2;
 		FINDDATA_NODES = 3;
-		STORE = 4;
+		//STORE = 4;
 	}
 	int64 messageID = 1;	//Same as above
 	Type type = 2;
@@ -62,4 +65,19 @@ message contact
 	string ID = 1;
 	string address = 2;
 	string distance = 3;
+}
+
+message CSTORE
+{
+	string hash = 1;
+}
+
+message CLOCAL
+{
+	repeated string mine = 1;
+	repeated string other = 2;
+}
+message CLOOKUP
+{
+	bytes data = 1;
 }

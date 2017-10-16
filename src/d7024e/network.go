@@ -133,10 +133,10 @@ func (network *Network) Listen() {
 		var received *messages.Message = &messages.Message{}
 		err = proto.Unmarshal(buff[:n], received)
 		CheckError(err)
-		
-		var sender Contact = NewContact(NewKademliaID(received.Sender.ID), received.Sender.Address)
-		go network.kad.rt.AddContact(sender)
-		
+		if(received.Sender.ID != "") {
+			var sender Contact = NewContact(NewKademliaID(received.Sender.ID), received.Sender.Address)
+			go network.kad.rt.AddContact(sender)
+		}
 		if(received.Type == messages.Message_RESPONSE) {
 			//fmt.Println("Listened response")
 			go network.addResponse(*received.Response)
@@ -155,6 +155,21 @@ func (network *Network) Listen() {
 				case messages.Request_STORE: 
 					go network.respondStoreMessage(*received)
 					break
+				case messages.Request_CLIENT_PIN:
+					fmt.Println("pin")
+					go network.respondClientPin(*received)
+				case messages.Request_CLIENT_UNPIN:
+					fmt.Println("unpin")
+					go network.respondClientUnpin(*received)
+				case messages.Request_CLIENT_LOOKUP:
+					fmt.Println("look")
+					go network.respondClientLookup(*received)
+				case messages.Request_CLIENT_STORE:
+					fmt.Println("store")
+					go network.respondClientStore(*received)
+				case messages.Request_CLIENT_LOCAL:
+					fmt.Println("local")
+					go network.respondClientStore(*received)
 				default:
 					fmt.Println("Error: Unknown request type")
 			}
@@ -305,7 +320,9 @@ func (network *Network) respondFindDataMessage(received messages.Message) {
 	var dataFound bool = false
 	
 	data, dataFound = (*network.kad.data)[received.Request.ID] 
-	
+	if(!dataFound) {
+		data, dataFound = (*network.kad.myData)[received.Request.ID]
+	}
 	if(dataFound) {
 		response.Data = *data.data
 		response.Type = messages.Response_FINDDATA_FOUND
@@ -390,5 +407,94 @@ func (network *Network) SendStoreMessage(contact *Contact, hash string, data []b
 	buff, err = proto.Marshal(&msg)
 	CheckError(err)
 	_, err = Conn.Write(buff)
+	CheckError(err)
+}
+
+func (network *Network) respondClientPin(received messages.Message) {
+	var hash string = received.Request.ID
+	val, ok := (*network.kad.data)[hash]
+	if ok {
+		(*network.kad.myData)[hash] = val
+		delete(*network.kad.data, hash)
+	}
+}
+func (network *Network) respondClientUnpin(received messages.Message) {
+	var hash string = received.Request.ID
+	val, ok := (*network.kad.myData)[hash]
+	if ok {
+		(*network.kad.data)[hash] = val
+		delete(*network.kad.myData, hash)
+	}
+}
+func (network *Network) respondClientLookup(received messages.Message) {
+	var hash string = received.Request.ID
+	var data []byte
+	if val, ok := (*network.kad.myData)[hash]; ok {
+		data = *val.data
+	} else {
+		if val, ok = (*network.kad.data)[hash]; ok {
+			data = *val.data
+		} else {
+			data = *network.kad.LookupData(hash)
+		}
+	}
+	var respond messages.CLOOKUP = messages.CLOOKUP{data}
+	var buffer []byte
+	buffer, err := proto.Marshal(&respond)
+	CheckError(err)
+	
+	ServerAddr, err := net.ResolveUDPAddr("udp", received.Sender.Address)
+	CheckError(err)
+	Conn, err := net.DialUDP("udp", nil, ServerAddr)
+	CheckError(err)
+	defer Conn.Close()
+	
+	_, err = Conn.Write(buffer)
+	CheckError(err)
+}
+func (network *Network) respondClientStore(received messages.Message) {
+	fmt.Println("1")
+	var hash string = network.kad.Store(received.Request.Data)
+	fmt.Println("2")
+	var respond messages.CSTORE = messages.CSTORE{hash}
+	fmt.Println(hash)
+	fmt.Println(received.Sender.Address)
+	var buffer []byte
+	buffer, err := proto.Marshal(&respond)
+	CheckError(err)
+	fmt.Println("3")
+	ServerAddr, err := net.ResolveUDPAddr("udp", received.Sender.Address)
+	CheckError(err)
+	fmt.Println("4")
+	Conn, err := net.DialUDP("udp", nil, ServerAddr)
+	CheckError(err)
+	defer Conn.Close()
+	fmt.Println("5")
+	
+	n, err := Conn.Write(buffer)
+	CheckError(err)
+	fmt.Println("Wrote",n,"bytes")
+}
+func (network *Network) respondClientLocal(received messages.Message) {
+	var mine []string
+	var other []string
+	for hash, _ := range *network.kad.myData {
+		mine = append(mine, hash)
+	}
+	for hash, _ := range *network.kad.data {
+		other = append(other, hash)
+	}
+	var response messages.CLOCAL = messages.CLOCAL{mine, other}
+	var buffer []byte
+	buffer, err := proto.Marshal(&response)
+	CheckError(err)
+	
+	ServerAddr, err := net.ResolveUDPAddr("udp", received.Sender.Address)
+	CheckError(err)
+	Conn, err := net.DialUDP("udp", nil, ServerAddr)
+	CheckError(err)
+	defer Conn.Close()
+	
+	_, err = Conn.Write(buffer)
 	CheckError(err)
 }

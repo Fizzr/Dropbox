@@ -70,6 +70,7 @@ func (mn *MockNetwork) SendFindDataMessage(contact *Contact, hash string) (*Clos
 }
 
 var mapmap map[*KademliaID]*(map[string]*[]byte) = make(map[*KademliaID]*(map[string]*[]byte))
+
 func (mn *MockNetwork) SendStoreMessage(contact *Contact, hash string, data []byte) {
 	m, ok := mapmap[contact.ID]
 	if(!ok){
@@ -287,7 +288,8 @@ func TestFindData(t *testing.T) {
 	var c Contact = NewContact(NewRandomKademliaID(), "localhost:8001")
 	var rt *RoutingTable = NewRoutingTable(c)
 	var dat map[string]*dataStruct = make(map[string]*dataStruct)
-	kad = &Kademlia{rt, mn, &dat, nil} // Send Data In Here?
+	var myDat map[string]*dataStruct = make(map[string]*dataStruct)
+	kad = &Kademlia{rt, mn, &dat, &myDat} // Send Data In Here?
 	rt.AddContact(base)
 
 	var data string = "9cfef18a4799c191f79c9995dc2d7b9a49fcd213"
@@ -316,5 +318,15 @@ func TestFindData(t *testing.T) {
 		fmt.Println("Success - Kademlia LookupData")
 	} else {
 		t.Fail()
+	}
+}
+
+func TestBigTest (t *testing.T) {
+	var port int = 9000
+	var base *Kademlia = NewKademlia("localhost", fmt.Sprintf("%d", port), nil)
+	port++
+	for i := 0; i < 100; i++ {
+		go NewKademlia("localhost", fmt.Sprintf("%d", port), &base.rt.me)
+		port++
 	}
 }
