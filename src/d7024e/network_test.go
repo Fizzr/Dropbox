@@ -29,7 +29,8 @@ func writeByte(address string, b []byte) {
 func TestNetwork(t *testing.T) {
 	//Simple network test
 	var addr *net.UDPAddr
-	addr, err := net.ResolveUDPAddr("udp", "localhost:8001")
+	var port = "8888"
+	addr, err := net.ResolveUDPAddr("udp", "localhost:"+port)
 
 	conn, err := net.ListenUDP("udp", addr)
 	if err != nil {
@@ -40,7 +41,7 @@ func TestNetwork(t *testing.T) {
 	var b []byte = make([]byte, 255)
 	var w []byte = []byte{0x01, 0x02, 0x03, 0xFF}
 	//RACE!
-	go writeByte("localhost:8001", w)
+	go writeByte("localhost:"+port, w)
 	//RACE!
 	num, err := conn.Read(b)
 	if err != nil {
@@ -61,7 +62,8 @@ func TestNetwork(t *testing.T) {
 func TestProtobufNetwork(t *testing.T) {
 	//Simple Protobuf test
 	var addr *net.UDPAddr
-	addr, err := net.ResolveUDPAddr("udp", "localhost:8001")
+	var port string = "8800"
+	addr, err := net.ResolveUDPAddr("udp", "localhost:"+port)
 	var a messages.Message = messages.Message{}
 	sender := &messages.Contact{}
 	sender.ID = "12344321"
@@ -81,7 +83,7 @@ func TestProtobufNetwork(t *testing.T) {
 	}
 	var b []byte = make([]byte, 255)
 	//RACE!
-	go writeByte("localhost:8001", p)
+	go writeByte("localhost:"+port, p)
 	//RACE!
 	num, err := conn.Read(b)
 	if err != nil {

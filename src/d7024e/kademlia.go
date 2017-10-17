@@ -7,7 +7,7 @@ import (
 
 	ripemd160 "golang.org/x/crypto/ripemd160"
 	//	"sync/atomic"
-	"fmt"
+	//"fmt"
 	"sort"
 	"time"
 )
@@ -44,15 +44,15 @@ func NewKademlia(address string, port string, base *Contact) *Kademlia {
 	var net Network
 	var data map[string]*dataStruct = make(map[string]*dataStruct)
 	var myData map[string]*dataStruct = make(map[string]*dataStruct)
-	var k *Kademlia = &Kademlia{rt, &net, &data, &myData}
-	net = NewNetwork(address, port, k)
+	var k Kademlia = Kademlia{rt, &net, &data, &myData}
+	net = NewNetwork(address, port, &k)
 	go k.dataChecker()
 
 	if base != nil {
 		k.rt.AddContact(*base)
 		k.FindNode(&c)
 	}
-	return k
+	return &k
 }
 
 func newKademlia(address string, network Net, base *Contact) *Kademlia {
@@ -120,7 +120,9 @@ func (as *asyncStruct) getNext() *CloseContact {
 				as.cond.L.Unlock()
 				return nil //No new item we haven't already checked.
 			}
+			//fmt.Println("slep", as.activeThreads)
 			as.cond.Wait() //Wait until other threads return with new information
+			//fmt.Println("wek")
 		}
 		c = as.cc[0]
 		as.cc = as.cc[1:]
@@ -199,6 +201,13 @@ func (as *asyncStruct) addResult(res CloseContacts) {
 	//	as.cc = (append(as.cc, res...))
 	//	sort.Sort(as.cc)
 	as.cc = newCC
+	as.activeThreads--
+	as.cond.Broadcast()
+	as.cond.L.Unlock()
+}
+
+func (as *asyncStruct) reduceThreads() {
+	as.cond.L.Lock()
 	as.activeThreads--
 	as.cond.Broadcast()
 	as.cond.L.Unlock()
@@ -296,11 +305,15 @@ func (kademlia *Kademlia) FindNode(target *Contact) CloseContacts {
 
 func (kademlia *Kademlia) asyncLookupData(hash string, as *asyncStruct, resultdata *[]byte) {
 	defer as.wg.Done()
+	//defer fmt.Println("BRAP!")
+	//fmt.Println("da ting goes")
 	for as.run {
+		//fmt.Println("bap")
 		var c *CloseContact = as.getNext()
 		if c == nil {
 			return
 		}
+		//fmt.Println("pap")
 		//fmt.Printf("Thread %v - Searching %s\n", num, c)
 		var data *[]byte
 		newconts, data := kademlia.network.SendFindDataMessage(&c.contact, hash)
@@ -310,9 +323,13 @@ func (kademlia *Kademlia) asyncLookupData(hash string, as *asyncStruct, resultda
 			*resultdata = *data
 			//fmt.Println(resultdata)
 			as.run = false
+			//fmt.Println("FOUND DAT SHEIT!")
+			as.reduceThreads()
+			return
 		} else if newconts != nil {
 			as.addResult(*newconts)
 		}
+		as.reduceThreads()
 
 		/* Three different Cases:
 		nil, []byte
@@ -342,11 +359,10 @@ func (kademlia *Kademlia) LookupData(hash string) *[]byte {
 		var as *asyncStruct = kademlia.NewAsyncStruct(cc)
 		var resultdata1 []byte = []byte("")
 		as.wg.Add(alpha)
-		for i := 0; i < len(cc) && i < alpha; i++ {
+		for i := 0; i < alpha; i++ {
 			go kademlia.asyncLookupData(hash, as, &resultdata1)
 		}
-
-		//as.wg.Wait()
+		as.wg.Wait()
 		//fmt.Println(resultdata1)
 		return &resultdata1
 	}
@@ -356,26 +372,26 @@ func (kademlia *Kademlia) Store(data []byte) string {
 
 	// Hash data to get handle
 	hasher := ripemd160.New()
-	fmt.Println("a")
 	hasher.Write(data)
 	var hash string = hex.EncodeToString(hasher.Sum(nil))
-	fmt.Println("b")
-	(*kademlia.myData)[hash] = &dataStruct{&data, time.Now().Add(-1 * timeToLive)}
+	(*kademlia.myData)[hash] = &dataStruct{&data, time.Now()}
 	//fmt.Println("c")
-	fmt.Println(hash)
+	//fmt.Println(hash)
 	// Store data in own file (I think?)
 
-	// Do lookup on data handle (I think?)
-	//var look Contact = NewContact(NewKademliaID(hash), "")
-	//fmt.Println(look)
-	//var cc CloseContacts = kademlia.FindNode(&look)
-	//fmt.Println("d")
+	go func () {
+		// Do lookup on data handle (I think?)
+		var look Contact = NewContact(NewKademliaID(hash), "")
+		//fmt.Println(look)
+		var cc CloseContacts = kademlia.FindNode(&look)
+		//fmt.Println("d")
 
-	// Store data in k closest nodes (I think?)
+		// Store data in k closest nodes (I think?)
 
-	//for i := 0; i < len(cc) && i < alpha; i++ {
-	//go kademlia.network.SendStoreMessage(&cc[i].contact, hash, data)
-	//}
+		for i := 0; i < len(cc) && i < alpha; i++ {
+			go kademlia.network.SendStoreMessage(&cc[i].contact, hash, data)
+		}
+	} ()
 	//fmt.Println("e")
 	// return handle
 	return hash

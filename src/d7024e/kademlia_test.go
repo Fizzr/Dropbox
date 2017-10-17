@@ -66,7 +66,14 @@ func (mn *MockNetwork) SendFindContactMessage(contact *Contact, target *Kademlia
 	return nil
 }
 func (mn *MockNetwork) SendFindDataMessage(contact *Contact, hash string) (*CloseContacts, *[]byte) {
+	if hash == "9cfef18a4799c191f79c9995dc2d7b9a49fcd213" {
+		//returnByteData = []byte(hash)
+		var derp []byte
+		derp = []byte("apa")
+		return nil, &derp
+	}
 	return nil, nil
+
 }
 
 var mapmap map[*KademliaID]*(map[string]*[]byte) = make(map[*KademliaID]*(map[string]*[]byte))
@@ -237,12 +244,14 @@ func TestRepublish(t *testing.T) {
 	var saved []byte = []byte(encrypt)
 	var hash string = k.Store(saved)
 	var bueno bool = true
-	time.Sleep(500*time.Millisecond)
+	time.Sleep(5*time.Second)//500*time.Millisecond)
 	
 	ds, ok := (*k.data)[hash]
 	bueno = bueno && ok
 	if(!ok) {
 		fmt.Println("Republish: Data not stored!")
+		//fmt.Println(*k.data)
+		//fmt.Println(*k.myData)
 	} else {
 		for i:= 0; i < len(*ds.data); i ++ {
 			var good bool = (*ds.data)[i] == saved[i]
@@ -285,7 +294,7 @@ func TestFindData(t *testing.T) {
 	var kad *Kademlia
 	var mn *MockNetwork = &MockNetwork{"localhost", 8000, nil}
 	var base Contact = randRTs[29].me
-	var c Contact = NewContact(NewRandomKademliaID(), "localhost:8001")
+	var c Contact = NewContact(NewRandomKademliaID(), "localhost:8666")
 	var rt *RoutingTable = NewRoutingTable(c)
 	var dat map[string]*dataStruct = make(map[string]*dataStruct)
 	var myDat map[string]*dataStruct = make(map[string]*dataStruct)
@@ -318,15 +327,5 @@ func TestFindData(t *testing.T) {
 		fmt.Println("Success - Kademlia LookupData")
 	} else {
 		t.Fail()
-	}
-}
-
-func TestBigTest (t *testing.T) {
-	var port int = 9000
-	var base *Kademlia = NewKademlia("localhost", fmt.Sprintf("%d", port), nil)
-	port++
-	for i := 0; i < 100; i++ {
-		go NewKademlia("localhost", fmt.Sprintf("%d", port), &base.rt.me)
-		port++
 	}
 }

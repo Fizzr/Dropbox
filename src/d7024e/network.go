@@ -120,7 +120,7 @@ func (network *Network) Listen() {
 
 	for {
 		n, err := ServerConn.Read(buff)
-		//fmt.Printf("Received %d bytes. Buff len %d \n", n, len(buff))
+		fmt.Printf("Received %d bytes. Buff len %d \n", n, len(buff))
 		/*for i:= 0; i < n; i++ {
 			fmt.Print(buff[i])
 		}
@@ -453,23 +453,16 @@ func (network *Network) respondClientLookup(received messages.Message) {
 	CheckError(err)
 }
 func (network *Network) respondClientStore(received messages.Message) {
-	fmt.Println("1")
 	var hash string = network.kad.Store(received.Request.Data)
-	fmt.Println("2")
 	var respond messages.CSTORE = messages.CSTORE{hash}
-	fmt.Println(hash)
-	fmt.Println(received.Sender.Address)
 	var buffer []byte
 	buffer, err := proto.Marshal(&respond)
 	CheckError(err)
-	fmt.Println("3")
 	ServerAddr, err := net.ResolveUDPAddr("udp", received.Sender.Address)
 	CheckError(err)
-	fmt.Println("4")
 	Conn, err := net.DialUDP("udp", nil, ServerAddr)
 	CheckError(err)
 	defer Conn.Close()
-	fmt.Println("5")
 	time.Sleep(500 * time.Millisecond)
 	n, err := Conn.Write(buffer)
 	CheckError(err)

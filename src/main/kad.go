@@ -39,7 +39,6 @@ func getStuff(port int) (net.Conn, messages.Message) {
 	ServerAddr, err := net.ResolveUDPAddr("udp", "localhost:"+fmt.Sprint(port))
 	CheckError(err)
 	Conn, err := net.DialUDP("udp", nil, ServerAddr)
-	fmt.Println(Conn.RemoteAddr().String())
 	CheckError(err)
 	Conn.SetDeadline(time.Now().Add(5 * time.Second))
 	retAddr := Conn.LocalAddr().String()
@@ -93,14 +92,18 @@ func main() {
 
 		msg.Request.Type = messages.Request_CLIENT_STORE
 		msg.Request.Data = dat
+		
 		var buff []byte
 		var returned []byte = make([]byte, 4096)
 		buff, err = proto.Marshal(&msg)
 		CheckError(err)
+		
 		n, err := conn.Write(buff)
 		CheckError(err)
 		conn.Close()
+		
 		ServerConn, err := net.ListenUDP("udp", retAddr)
+		ServerConn.SetDeadline(time.Now().Add(5*time.Second))
 		defer ServerConn.Close()
 		n, err = ServerConn.Read(returned)
 		CheckError(err)
@@ -135,23 +138,30 @@ func main() {
 			return
 		}
 		conn, msg := getStuff(port)
-		defer conn.Close()
+		retAddr, err := net.ResolveUDPAddr("udp", conn.LocalAddr().String())
+		
 		msg.Request.Type = messages.Request_CLIENT_LOOKUP
 		msg.Request.ID = args[2]
+		
 		var buff []byte
-		buff, err := proto.Marshal(&msg)
+		var returned []byte = make([]byte, 4096)
+		
+		buff, err = proto.Marshal(&msg)
 		CheckError(err)
 		n, err := conn.Write(buff)
 		CheckError(err)
-		var returned []byte = make([]byte, 4096)
-		n, err = conn.Read(returned)
+		conn.Close()
+		
+		ServerConn, err := net.ListenUDP("udp", retAddr)
+		ServerConn.SetDeadline(time.Now().Add(5*time.Second))
+		n, err = ServerConn.Read(returned)
 		CheckError(err)
 		clook := messages.CLOOKUP{}
 		err = proto.Unmarshal(returned[:n], &clook)
 		CheckError(err)
 		var out string = string(clook.Data)
 		fmt.Println(out)
-
+		
 	case "Local":
 		fallthrough
 	case "local":
@@ -162,16 +172,23 @@ func main() {
 		fmt.Println("Localing")
 		//ask target for local data
 		conn, msg := getStuff(port)
-		defer conn.Close()
+		retAddr, err := net.ResolveUDPAddr("udp", conn.LocalAddr().String())
+		
 		msg.Request.Type = messages.Request_CLIENT_LOCAL
+
+		var returned []byte = make([]byte, 4096)		
 		var buff []byte
-		buff, err := proto.Marshal(&msg)
+		buff, err = proto.Marshal(&msg)
 		CheckError(err)
 		n, err := conn.Write(buff)
 		CheckError(err)
-		var returned []byte = make([]byte, 4096)
-		n, err = conn.Read(returned)
+		conn.Close()
+		
+		ServerConn, err := net.ListenUDP("udp", retAddr)
+		ServerConn.SetDeadline(time.Now().Add(5*time.Second))
+		n, err = ServerConn.Read(returned)
 		CheckError(err)
+
 		cloc := messages.CLOCAL{}
 		err = proto.Unmarshal(returned[:n], &cloc)
 		CheckError(err)
