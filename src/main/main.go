@@ -9,17 +9,17 @@ import (
 var bla []*kademlia.Kademlia //= make([]*kademlia.Kademlia, 99) 
 
 func main()  {
-	var port int = 8000
+	var port, num int = 8000, 9
 	var base *kademlia.Kademlia = kademlia.NewKademlia("localhost", fmt.Sprintf("%d", port), nil)
 	port++
-	for i := 1; i < 100; i++ { fmt.Print("'") }
+	for i := 0; i < num; i++ { fmt.Print("'") }
 	fmt.Println()
-	for i := 1; i < 100; i++ {
+	for i := 0; i < num; i++ {
 		bla = append(bla, kademlia.NewKademlia("localhost", fmt.Sprintf("%d", port), base.Me()))
 		port++
 		fmt.Print("'")
 	}
-	fmt.Println("\nStarted 100 nodes, starting at port", port-100)
+	fmt.Println("\nStarted 100 nodes, starting at port", port-(num+1))
 	go func () {
 		for {
 			time.Sleep(5* time.Second)
@@ -27,7 +27,7 @@ func main()  {
 		}
 	}()
 	for {
-		for i := 0; i <99; i++ {
+		for i := 0; i <num; i++ {
 			if(bla[i] == nil) {
 				fmt.Println("pfft")
 			}
