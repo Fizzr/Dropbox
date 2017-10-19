@@ -156,20 +156,20 @@ func (network *Network) Listen() {
 				go network.respondStoreMessage(*received)
 				break
 			case messages.Request_CLIENT_PIN:
-				fmt.Println("pin")
+				//fmt.Println("pin")
 				go network.respondClientPin(*received)
 			case messages.Request_CLIENT_UNPIN:
-				fmt.Println("unpin")
+				//fmt.Println("unpin")
 				go network.respondClientUnpin(*received)
 			case messages.Request_CLIENT_LOOKUP:
-				fmt.Println("look")
+				//fmt.Println("look")
 				go network.respondClientLookup(*received)
 			case messages.Request_CLIENT_STORE:
-				fmt.Println("store")
+				//fmt.Println("store")
 				go network.respondClientStore(*received)
 			case messages.Request_CLIENT_LOCAL:
-				fmt.Println("local")
-				go network.respondClientStore(*received)
+				//fmt.Println("local")
+				go network.respondClientLocal(*received)
 			default:
 				fmt.Println("Error: Unknown request type")
 			}
@@ -469,12 +469,17 @@ func (network *Network) respondClientStore(received messages.Message) {
 	fmt.Println("Wrote", n, "bytes")
 }
 func (network *Network) respondClientLocal(received messages.Message) {
+	//fmt.Println("mjau")
 	var mine []string
 	var other []string
+	//fmt.Println(*network.kad.myData)
+	//fmt.Println(*network.kad.data)
 	for hash, _ := range *network.kad.myData {
+		fmt.Println(hash)
 		mine = append(mine, hash)
 	}
 	for hash, _ := range *network.kad.data {
+		fmt.Println(hash)
 		other = append(other, hash)
 	}
 	var response messages.CLOCAL = messages.CLOCAL{mine, other}

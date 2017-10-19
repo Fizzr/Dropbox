@@ -384,6 +384,7 @@ func (kademlia *Kademlia) Store(data []byte) string {
 		var look Contact = NewContact(NewKademliaID(hash), "")
 		//fmt.Println(look)
 		var cc CloseContacts = kademlia.FindNode(&look)
+		//fmt.Println("len", len(cc))
 		//fmt.Println("d")
 
 		// Store data in k closest nodes (I think?)

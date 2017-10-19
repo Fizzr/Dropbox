@@ -83,7 +83,7 @@ func main() {
 	case "Store":
 		fallthrough
 	case "store":
-		fmt.Println("storing")
+		//fmt.Println("storing")
 		//Find file and parse it
 		dat, err := ioutil.ReadFile(args[2])
 		CheckError(err)
@@ -115,7 +115,7 @@ func main() {
 	case "Pin":
 		fallthrough
 	case "pin":
-		fmt.Println("pinning")
+		//fmt.Println("pinning")
 		if !checkID(args[2]) {
 			return
 		}
@@ -124,7 +124,7 @@ func main() {
 	case "Unpin":
 		fallthrough
 	case "unpin":
-		fmt.Println("unpinning")
+		//fmt.Println("unpinning")
 		if !checkID(args[2]) {
 			return
 		}
@@ -133,7 +133,7 @@ func main() {
 	case "Cat":
 		fallthrough
 	case "cat":
-		fmt.Println("Kitty Cat!")
+		//fmt.Println("Kitty Cat!")
 		if !checkID(args[2]) {
 			return
 		}
@@ -169,7 +169,7 @@ func main() {
 			fmt.Printf("Unknown argument %s. Did you mean 'data'?\n", args[2])
 			return
 		}
-		fmt.Println("Localing")
+		//fmt.Println("Localing")
 		//ask target for local data
 		conn, msg := getStuff(port)
 		retAddr, err := net.ResolveUDPAddr("udp", conn.LocalAddr().String())

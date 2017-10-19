@@ -9,7 +9,7 @@ import (
 var bla []*kademlia.Kademlia //= make([]*kademlia.Kademlia, 99) 
 
 func main()  {
-	var port, num int = 8000, 9
+	var port, num int = 8000, 2
 	var base *kademlia.Kademlia = kademlia.NewKademlia("localhost", fmt.Sprintf("%d", port), nil)
 	port++
 	for i := 0; i < num; i++ { fmt.Print("'") }
@@ -19,7 +19,7 @@ func main()  {
 		port++
 		fmt.Print("'")
 	}
-	fmt.Println("\nStarted 100 nodes, starting at port", port-(num+1))
+	fmt.Printf("\nStarted %d nodes, starting at port %d\n", num+1, port-(num+1))
 	go func () {
 		for {
 			time.Sleep(5* time.Second)
